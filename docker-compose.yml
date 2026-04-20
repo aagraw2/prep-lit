@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    env_file: .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - preplit
+
+  # Development server with hot reload
+  server-dev:
+    profiles: ["dev"]
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    volumes:
+      - ./server/src:/app/src
+      - ./server/pom.xml:/app/pom.xml
+    networks:
+      preplit:
+        aliases:
+          - server
+
+  # Production server
+  server-prod:
+    profiles: ["prod"]
+    build:
+      context: ./server
+      dockerfile: Dockerfile.prod
+    ports:
+      - "8080:8080"
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      preplit:
+        aliases:
+          - server
+
+  # Development client with hot reload
+  client-dev:
+    profiles: ["dev"]
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    depends_on:
+      server-dev:
+        condition: service_healthy
+    volumes:
+      - ./client/src:/app/src
+    networks:
+      - preplit
+
+  # Production client
+  client-prod:
+    profiles: ["prod"]
+    build:
+      context: ./client
+      dockerfile: Dockerfile.prod
+    ports:
+      - "3000:3000"
+    depends_on:
+      server-prod:
+        condition: service_healthy
+    networks:
+      - preplit
+
+networks:
+  preplit:
+    driver: bridge
+
+volumes:
+  postgres_data:
