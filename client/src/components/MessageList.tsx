@@ -5,15 +5,31 @@ interface MessageListProps {
 }
 
 const colors = {
-  primary: '#1a1d29',
-  secondary: '#252936',
-  accent: '#D4A574',
-  accentDark: '#C89850',
+  primary: '#0f1117',
+  secondary: '#1a1f2e',
+  accent: '#4f8ef7',
+  accentDark: '#3a6fd8',
   text: '#e8eaed',
-  textMuted: '#9aa0a6',
-  border: '#3c4043',
-  userBubble: '#2d3142',
+  textMuted: '#8b95a8',
+  border: '#2a3147',
+  userBubble: '#1e2640',
 }
+
+// Lightbulb SVG icon for AI
+const BulbIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9 21h6M12 3a6 6 0 0 1 6 6c0 2.22-1.21 4.16-3 5.2V17a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1v-2.8C7.21 13.16 6 11.22 6 9a6 6 0 0 1 6-6z"
+      stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+)
+
+// Human outline SVG icon for user
+const UserIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="8" r="4" stroke="#8b95a8" strokeWidth="1.8"/>
+    <path d="M4 20c0-4 3.58-7 8-7s8 3 8 7" stroke="#8b95a8" strokeWidth="1.8" strokeLinecap="round"/>
+  </svg>
+)
 
 export function MessageList({ messages }: MessageListProps) {
   return (
@@ -58,11 +74,10 @@ export function MessageList({ messages }: MessageListProps) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '16px',
               flexShrink: 0,
-              boxShadow: `0 2px 8px rgba(212, 165, 116, 0.3)`,
+              boxShadow: `0 2px 8px rgba(79, 142, 247, 0.3)`,
             }}>
-              🔥
+              <BulbIcon />
             </div>
           )}
           <div
@@ -95,10 +110,9 @@ export function MessageList({ messages }: MessageListProps) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '16px',
               flexShrink: 0,
             }}>
-              👤
+              <UserIcon />
             </div>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { InterviewType, SdeRole, FeedbackReport } from '../types'
 import { createSession, createSessionWithResume, sendMessage, getSession, endInterview } from '../api/client'
 import { useTextToSpeech } from '../hooks/useTextToSpeech'
@@ -22,17 +23,17 @@ const roleLabels: Record<SdeRole, string> = {
   SDE3: 'Senior Engineer',
 }
 
-// Futuristic color palette
+// Color palette — blue theme
 const colors = {
-  primary: '#1a1d29',
-  secondary: '#252936',
-  accent: '#D4A574',
-  accentDark: '#C89850',
+  primary: '#0f1117',
+  secondary: '#1a1f2e',
+  accent: '#4f8ef7',
+  accentDark: '#3a6fd8',
   text: '#e8eaed',
-  textMuted: '#9aa0a6',
-  border: '#3c4043',
-  success: '#81c995',
-  error: '#f28b82',
+  textMuted: '#8b95a8',
+  border: '#2a3147',
+  success: '#4ade80',
+  error: '#f87171',
 }
 
 const Logo = ({ size = 40 }: { size?: number }) => (
@@ -40,14 +41,15 @@ const Logo = ({ size = 40 }: { size?: number }) => (
     src="/logo.png" 
     alt="PrepLit Logo" 
     style={{ 
-      width: size, 
       height: size,
+      width: 'auto',
       objectFit: 'contain'
     }} 
   />
 )
 
 export function InterviewSession() {
+  const navigate = useNavigate()
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [interviewType, setInterviewType] = useState<InterviewType>('DSA')
   const [sdeRole, setSdeRole] = useState<SdeRole>('SDE1')
@@ -197,41 +199,14 @@ export function InterviewSession() {
           background: colors.secondary,
           borderRadius: '20px',
           padding: '48px',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 1px rgba(212, 165, 116, 0.3)',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 1px rgba(79, 142, 247, 0.3)',
           maxWidth: '440px',
           width: '100%',
           border: `1px solid ${colors.border}`,
         }}>
-          {/* Logo and Title */}
+          {/* Logo */}
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '20px',
-            }}>
-              <Logo size={80} />
-            </div>
-            <h1 style={{
-              fontSize: '48px',
-              fontWeight: '700',
-              background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              margin: '0 0 8px',
-              letterSpacing: '-1px',
-              fontFamily: 'Georgia, serif',
-            }}>
-              prep<span style={{ fontWeight: '400' }}>LIT</span>
-            </h1>
-            <p style={{
-              color: colors.accent,
-              fontSize: '13px',
-              margin: 0,
-              letterSpacing: '2px',
-              textTransform: 'uppercase',
-              fontWeight: '600',
-            }}>Igniting Interview Success</p>
+            <Logo size={200} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -387,18 +362,18 @@ export function InterviewSession() {
                 borderRadius: '10px',
                 cursor: isStarting ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s',
-                boxShadow: isStarting ? 'none' : `0 4px 20px rgba(212, 165, 116, 0.3)`,
+                boxShadow: isStarting ? 'none' : `0 4px 20px rgba(79, 142, 247, 0.3)`,
                 letterSpacing: '0.5px',
               }}
               onMouseEnter={(e) => {
                 if (!isStarting) {
                   e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = `0 6px 25px rgba(212, 165, 116, 0.4)`
+                  e.currentTarget.style.boxShadow = `0 6px 25px rgba(79, 142, 247, 0.4)`
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = isStarting ? 'none' : `0 4px 20px rgba(212, 165, 116, 0.3)`
+                e.currentTarget.style.boxShadow = isStarting ? 'none' : `0 4px 20px rgba(79, 142, 247, 0.3)`
               }}
             >
               {isStarting ? 'Initializing...' : 'Start Interview'}
@@ -410,10 +385,35 @@ export function InterviewSession() {
             fontSize: '12px',
             color: colors.textMuted,
             marginTop: '32px',
-            marginBottom: 0,
+            marginBottom: '12px',
           }}>
-            Practice makes perfect. Good luck! 🔥
+            Practice makes perfect. Good luck!
           </p>
+          <button
+            onClick={() => navigate('/history')}
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '10px',
+              background: 'none',
+              border: `1px solid ${colors.border}`,
+              borderRadius: '8px',
+              color: colors.textMuted,
+              fontSize: '13px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = colors.accent
+              e.currentTarget.style.color = colors.accent
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = colors.border
+              e.currentTarget.style.color = colors.textMuted
+            }}
+          >
+            View Past Interviews →
+          </button>
         </div>
       </div>
     )
@@ -436,30 +436,16 @@ export function InterviewSession() {
         boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
         borderBottom: `1px solid ${colors.border}`,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <Logo size={40} />
-          <div>
-            <h1 style={{
-              margin: 0,
-              fontSize: '20px',
-              fontWeight: '700',
-              background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              letterSpacing: '-0.5px',
-              fontFamily: 'Georgia, serif',
-            }}>
-              prep<span style={{ fontWeight: '400' }}>LIT</span>
-            </h1>
-            <p style={{
-              margin: 0,
-              fontSize: '12px',
-              color: colors.textMuted,
-              fontWeight: '500',
-            }}>
-              {interviewTypeLabels[interviewType]} • {roleLabels[sdeRole]}
-            </p>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img src="/header.png" alt="PrepLit" style={{ height: 72, width: 'auto', objectFit: 'contain' }} />
+          <p style={{
+            margin: 0,
+            fontSize: '12px',
+            color: colors.textMuted,
+            fontWeight: '500',
+          }}>
+            {interviewTypeLabels[interviewType]} • {roleLabels[sdeRole]}
+          </p>
         </div>
         <button
           onClick={handleEndInterview}
@@ -482,7 +468,7 @@ export function InterviewSession() {
           onMouseEnter={(e) => {
             if (!isEndingInterview && !isStreaming) {
               e.currentTarget.style.transform = 'translateY(-1px)'
-              e.currentTarget.style.boxShadow = `0 4px 12px rgba(212, 165, 116, 0.3)`
+              e.currentTarget.style.boxShadow = `0 4px 12px rgba(79, 142, 247, 0.3)`
             }
           }}
           onMouseLeave={(e) => {

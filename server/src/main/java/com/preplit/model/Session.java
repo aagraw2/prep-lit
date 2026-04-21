@@ -26,6 +26,9 @@ public class Session {
     @Column(columnDefinition = "TEXT")
     private String resumeText;
 
+    @Column(columnDefinition = "TEXT")
+    private String feedbackJson;
+
     private Instant createdAt;
 
     private Instant updatedAt;
@@ -64,4 +67,7 @@ public class Session {
 
     public String getResumeText() { return resumeText; }
     public void setResumeText(String resumeText) { this.resumeText = resumeText; }
+
+    public String getFeedbackJson() { return feedbackJson; }
+    public void setFeedbackJson(String feedbackJson) { this.feedbackJson = feedbackJson; }
 }

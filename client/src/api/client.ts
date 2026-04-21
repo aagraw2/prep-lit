@@ -73,6 +73,12 @@ export async function sendMessage(
   onDone()
 }
 
+export async function listSessions(): Promise<Session[]> {
+  const res = await fetch(`${BASE}/api/sessions`)
+  if (!res.ok) throw new Error(`listSessions failed: ${res.status}`)
+  return res.json()
+}
+
 export async function getSession(sessionId: string): Promise<SessionWithMessages> {
   const res = await fetch(`${BASE}/api/sessions/${sessionId}`)
   if (!res.ok) throw new Error(`getSession failed: ${res.status}`)

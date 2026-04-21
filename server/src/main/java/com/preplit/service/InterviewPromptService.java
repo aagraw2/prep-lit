@@ -96,25 +96,32 @@ public class InterviewPromptService {
         instructions.append("--------------------------------\n");
         instructions.append("STATE-BASED INSTRUCTIONS\n");
         instructions.append("--------------------------------\n");
-        
+
+        if (context.getCandidateState().frustration() == FrustrationLevel.HIGH) {
+            instructions.append("CANDIDATE IS FRUSTRATED — MANDATORY ACTION:\n");
+            instructions.append("- Drop the current topic immediately. Do not ask about it again.\n");
+            instructions.append("- Acknowledge briefly (one sentence max) and move to a completely different topic.\n");
+            instructions.append("- Example: 'Got it, let's move on.' then ask about something new.\n");
+            return instructions.toString();
+        }
+
         switch (context.getInterviewerState()) {
             case STUCK -> {
-                instructions.append("CANDIDATE IS STUCK:\n");
                 if (context.canGiveMoreHints()) {
-                    instructions.append(String.format("- Give ONE small hint (hints remaining: %d/3)\n", 3 - context.getHintCount()));
+                    instructions.append("CANDIDATE IS STUCK:\n");
+                    instructions.append(String.format("- Give ONE small nudge or hint (hints remaining: %d/3)\n", 3 - context.getHintCount()));
+                    instructions.append("- If they still can't answer after this, move to the next topic.\n");
                 } else {
-                    instructions.append("- NO MORE HINTS AVAILABLE\n");
+                    instructions.append("CANDIDATE IS STUCK — NO MORE HINTS:\n");
+                    instructions.append("- Move to the next topic. Do not probe this point further.\n");
                 }
             }
-            case PROGRESSING -> instructions.append("CANDIDATE IS PROGRESSING:\n- Ask deeper follow-up questions\n");
-            case DISENGAGED -> instructions.append("CANDIDATE IS DISENGAGED:\n- Simplify and re-engage\n");
-            case WRAPPING_UP -> instructions.append("WRAPPING UP:\n- Ask if they have questions\n");
+            case PROGRESSING -> instructions.append("CANDIDATE IS PROGRESSING:\n- Ask one deeper follow-up question.\n");
+            case DISENGAGED -> instructions.append("CANDIDATE IS DISENGAGED:\n- Simplify your question or pivot to a new topic.\n");
+            case WRAPPING_UP -> instructions.append("WRAPPING UP:\n- Ask one final wrap-up question, then end the interview.\n");
+            default -> {}
         }
-        
-        if (context.getCandidateState().frustration() == FrustrationLevel.HIGH) {
-            instructions.append("\nHIGH FRUSTRATION:\n- Be supportive\n");
-        }
-        
+
         return instructions.toString();
     }
     

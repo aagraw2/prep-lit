@@ -16,16 +16,16 @@ interface AudioDevice {
 }
 
 const colors = {
-  primary: '#1a1d29',
-  secondary: '#252936',
-  accent: '#D4A574',
-  accentDark: '#C89850',
+  primary: '#0f1117',
+  secondary: '#1a1f2e',
+  accent: '#4f8ef7',
+  accentDark: '#3a6fd8',
   text: '#e8eaed',
-  textMuted: '#9aa0a6',
-  border: '#3c4043',
-  success: '#81c995',
-  error: '#f28b82',
-  warning: '#fdd663',
+  textMuted: '#8b95a8',
+  border: '#2a3147',
+  success: '#4ade80',
+  error: '#f87171',
+  warning: '#facc15',
 }
 
 export function VoiceControls({ onSubmit, onHint, disabled, hintDisabled, isSpeaking }: VoiceControlsProps) {

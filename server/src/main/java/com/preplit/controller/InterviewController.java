@@ -58,10 +58,10 @@ public class InterviewController {
     }
 
     record CreateSessionRequest(InterviewType type, SdeRole role) {}
-    record SessionResponse(UUID id, InterviewType type, SdeRole role, String status) {}
+    record SessionResponse(UUID id, InterviewType type, SdeRole role, String status, java.time.Instant createdAt, FeedbackResponse feedback) {}
     record MessageRequest(String content) {}
     record MessageResponse(UUID id, String role, String content, Instant createdAt) {}
-    record SessionWithMessagesResponse(UUID id, InterviewType type, SdeRole role, String status, List<MessageResponse> messages) {}
+    record SessionWithMessagesResponse(UUID id, InterviewType type, SdeRole role, String status, List<MessageResponse> messages, FeedbackResponse feedback) {}
 
     @PostMapping("/sessions")
     public SessionResponse createSession(@RequestBody CreateSessionRequest req) {
@@ -75,7 +75,7 @@ public class InterviewController {
         String greeting = getGreetingForType(req.type());
         sessionService.addMessage(session.getId(), MessageRole.ASSISTANT, greeting);
 
-        return new SessionResponse(session.getId(), session.getType(), session.getRole(), session.getStatus().name());
+        return new SessionResponse(session.getId(), session.getType(), session.getRole(), session.getStatus().name(), session.getCreatedAt(), null);
     }
 
     @PostMapping(value = "/sessions/with-resume", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -93,41 +93,36 @@ public class InterviewController {
 
         return resumeParserService.extractText(resumeFile)
                 .map(resumeText -> {
-                    // Create session with resume
                     Session session = sessionService.createSessionWithResume("anonymous", type, role, resumeText);
 
-                    // Initialize interview context with resume
                     DifficultyLevel difficulty = mapRoleToDifficulty(role);
                     InterviewContext context = orchestrator.startInterview(session.getId(), difficulty, type);
                     context.setResumeText(resumeText);
                     orchestrator.saveContext(context);
 
-                    // Custom greeting for resume grilling
                     String greeting = "Hello! I've reviewed your resume. Let's dive in. Tell me briefly about your current role and what you've been working on recently.";
                     sessionService.addMessage(session.getId(), MessageRole.ASSISTANT, greeting);
 
-                    return new SessionResponse(session.getId(), session.getType(), session.getRole(), session.getStatus().name());
+                    return new SessionResponse(session.getId(), session.getType(), session.getRole(), session.getStatus().name(), session.getCreatedAt(), null);
                 })
                 .onErrorMap(e -> new RuntimeException("Failed to parse resume: " + e.getMessage(), e));
     }
 
-    private String getGreetingForType(InterviewType type) {
-        return switch (type) {
-            case CULTURE_FIT -> "Hello! I'm your PrepLit interviewer for today's culture fit interview. Let's start with you telling me a bit about yourself and what you're looking for in your next role.";
-            default -> String.format(
-                "Hello! I'm your PrepLit interviewer for today's %s interview. Let's begin with the problem.",
-                getTypeDisplayName(type)
-            );
-        };
+    @GetMapping("/sessions")
+    public List<SessionResponse> listSessions() {
+        return sessionService.listSessions().stream()
+                .map(s -> new SessionResponse(s.getId(), s.getType(), s.getRole(), s.getStatus().name(), s.getCreatedAt(),
+                        toFeedbackResponse(sessionService.getFeedback(s.getId()))))
+                .toList();
     }
 
-    private String getTypeDisplayName(InterviewType type) {
+    private String getGreetingForType(InterviewType type) {
         return switch (type) {
-            case DSA -> "DSA";
-            case HLD -> "system design";
-            case LLD -> "low-level design";
-            case RESUME_GRILLING -> "resume";
-            case CULTURE_FIT -> "culture fit";
+            case DSA -> "Hello! I'm your PrepLit interviewer. Before we start, please introduce yourself briefly.";
+            case HLD -> "Hello! I'm your PrepLit interviewer for today's system design interview. Before we start, please introduce yourself briefly.";
+            case LLD -> "Hello! I'm your PrepLit interviewer for today's low-level design interview. Before we start, please introduce yourself briefly.";
+            case CULTURE_FIT -> "Hello! I'm your PrepLit interviewer for today's culture fit interview. Let's start — tell me about yourself and what you're looking for in your next role.";
+            case RESUME_GRILLING -> "Hello! I've reviewed your resume. Let's dive in. Tell me briefly about your current role and what you've been working on recently.";
         };
     }
 
@@ -201,14 +196,11 @@ public class InterviewController {
                     if (devMode) {
                         log.debug("Token received: {}", token);
                     }
+                    accumulated.append(token);
                 })
                 .flatMap(token -> {
-                    accumulated.append(token);
                     buffer.append(token);
-
-                    // Process buffer to filter out <think>...</think> content
                     String result = processThinkTags(buffer, insideThinkTag);
-
                     if (result.isEmpty()) {
                         return Flux.empty();
                     }
@@ -234,36 +226,29 @@ public class InterviewController {
                     return Flux.just(ServerSentEvent.<String>builder("I'm sorry, I didn't catch that. Could you please repeat?").build());
                 });
     }
-    
+
     private String processThinkTags(StringBuilder buffer, boolean[] insideThinkTag) {
         StringBuilder result = new StringBuilder();
         String content = buffer.toString();
 
         while (true) {
             if (insideThinkTag[0]) {
-                // Looking for </think>
                 int endIdx = content.indexOf("</think>");
                 if (endIdx == -1) {
-                    // Haven't found end tag yet, keep buffering
-                    // But check if we might have a partial tag
                     if (content.length() > 8) {
-                        // Keep last 8 chars in case </think> is split
                         buffer.setLength(0);
                         buffer.append(content.substring(content.length() - 8));
                     }
                     return result.toString();
                 } else {
-                    // Found end tag, skip everything up to and including it
                     insideThinkTag[0] = false;
                     content = content.substring(endIdx + 8);
                     buffer.setLength(0);
                     buffer.append(content);
                 }
             } else {
-                // Looking for <think>
                 int startIdx = content.indexOf("<think>");
                 if (startIdx == -1) {
-                    // No think tag, but check for partial tag at end
                     int partialIdx = -1;
                     for (int i = 1; i <= 7 && i <= content.length(); i++) {
                         String suffix = content.substring(content.length() - i);
@@ -272,21 +257,17 @@ public class InterviewController {
                             break;
                         }
                     }
-
                     if (partialIdx != -1) {
-                        // Output everything before the partial tag
-                        result.append(content.substring(0, partialIdx));
+                        result.append(content, 0, partialIdx);
                         buffer.setLength(0);
                         buffer.append(content.substring(partialIdx));
                     } else {
-                        // No partial tag, output everything
                         result.append(content);
                         buffer.setLength(0);
                     }
                     return result.toString();
                 } else {
-                    // Found start tag
-                    result.append(content.substring(0, startIdx));
+                    result.append(content, 0, startIdx);
                     insideThinkTag[0] = true;
                     content = content.substring(startIdx + 7);
                     buffer.setLength(0);
@@ -297,7 +278,14 @@ public class InterviewController {
     }
 
     private String stripThinkTags(String content) {
-        return content.replaceAll("(?s)<think>.*?</think>", "").trim();
+        // Remove complete <think>...</think> blocks
+        String result = content.replaceAll("(?s)<think>.*?</think>", "");
+        // Remove any unclosed <think> block (model stopped mid-think)
+        int openIdx = result.indexOf("<think>");
+        if (openIdx != -1) {
+            result = result.substring(0, openIdx);
+        }
+        return result.trim();
     }
 
     @GetMapping("/sessions/{id}")
@@ -308,26 +296,24 @@ public class InterviewController {
                 .map(m -> new MessageResponse(m.getId(), m.getRole().name(), m.getContent(), m.getCreatedAt()))
                 .toList();
         return new SessionWithMessagesResponse(session.getId(), session.getType(), session.getRole(),
-                session.getStatus().name(), messageResponses);
+                session.getStatus().name(), messageResponses,
+                toFeedbackResponse(sessionService.getFeedback(id)));
     }
 
     @PostMapping("/sessions/{id}/end")
     public FeedbackResponse endInterview(@PathVariable UUID id) {
         FeedbackReport feedback = orchestrator.endInterview(id);
+        sessionService.saveFeedback(id, feedback);
+        return toFeedbackResponse(feedback);
+    }
+
+    private FeedbackResponse toFeedbackResponse(FeedbackReport f) {
+        if (f == null) return null;
         return new FeedbackResponse(
-            feedback.summary(),
-            feedback.strengths(),
-            feedback.weaknesses(),
-            feedback.verdict().name(),
-            feedback.nextSteps(),
-            new ScoresResponse(
-                feedback.scores().problemUnderstanding(),
-                feedback.scores().approach(),
-                feedback.scores().correctness(),
-                feedback.scores().communication(),
-                feedback.scores().optimization(),
-                feedback.scores().totalScore()
-            )
+            f.summary(), f.strengths(), f.weaknesses(), f.verdict().name(), f.nextSteps(),
+            new ScoresResponse(f.scores().problemUnderstanding(), f.scores().approach(),
+                f.scores().correctness(), f.scores().communication(),
+                f.scores().optimization(), f.scores().totalScore())
         );
     }
 
