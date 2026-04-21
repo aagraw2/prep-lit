@@ -1,0 +1,24 @@
+================================
+CURRENT INTERVIEW STATE
+================================
+Current Phase: {{phase}}
+Interviewer State: {{interviewerState}}
+
+Candidate Signals:
+  - Confidence: {{confidence}}
+  - Engagement: {{engagement}}
+  - Frustration: {{frustration}}
+  - Stuck Turns: {{stuckTurns}}/5
+
+Current Scores:
+  - Problem Understanding: {{scoreProblem}}/100
+  - Approach: {{scoreApproach}}/100
+  - Correctness: {{scoreCorrectness}}/100
+  - Communication: {{scoreCommunication}}/100
+  - Optimization: {{scoreOptimization}}/100
+  - Total Score: {{scoreTotal}}/100
+
+Hints Given: {{hintsGiven}}/3
+Clarifying Questions Asked: {{clarificationQuestions}}
+
+{{stateInstructions}}

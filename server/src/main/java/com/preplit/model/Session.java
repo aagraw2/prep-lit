@@ -23,6 +23,9 @@ public class Session {
     @Enumerated(EnumType.STRING)
     private SessionStatus status;
 
+    @Column(columnDefinition = "TEXT")
+    private String resumeText;
+
     private Instant createdAt;
 
     private Instant updatedAt;
@@ -58,4 +61,7 @@ public class Session {
 
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getResumeText() { return resumeText; }
+    public void setResumeText(String resumeText) { this.resumeText = resumeText; }
 }

@@ -4,7 +4,6 @@ import com.preplit.model.Message;
 import com.preplit.model.MessageRole;
 import com.preplit.model.Session;
 import com.preplit.router.ModelRouter;
-import com.preplit.service.PromptBuilder;
 import com.preplit.service.RAGService;
 import com.preplit.service.SessionService;
 import org.slf4j.Logger;
@@ -21,6 +20,14 @@ import java.util.UUID;
 
 import com.preplit.model.InterviewType;
 import com.preplit.model.SdeRole;
+import com.preplit.model.DifficultyLevel;
+import com.preplit.model.InterviewContext;
+import com.preplit.model.FeedbackReport;
+import com.preplit.service.InterviewPromptService;
+import com.preplit.service.InterviewOrchestrator;
+import com.preplit.service.ResumeParserService;
+import org.springframework.http.codec.multipart.FilePart;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api")
@@ -32,16 +39,21 @@ public class InterviewController {
     private final SessionService sessionService;
     private final RAGService ragService;
     private final ModelRouter modelRouter;
-    private final PromptBuilder promptBuilder;
+    private final InterviewPromptService interviewPromptService;
+    private final InterviewOrchestrator orchestrator;
+    private final ResumeParserService resumeParserService;
     private final boolean devMode;
 
     public InterviewController(SessionService sessionService, RAGService ragService,
-                               ModelRouter modelRouter, PromptBuilder promptBuilder,
+                               ModelRouter modelRouter, InterviewPromptService interviewPromptService,
+                               InterviewOrchestrator orchestrator, ResumeParserService resumeParserService,
                                @Value("${app.dev-mode:false}") boolean devMode) {
         this.sessionService = sessionService;
         this.ragService = ragService;
         this.modelRouter = modelRouter;
-        this.promptBuilder = promptBuilder;
+        this.interviewPromptService = interviewPromptService;
+        this.orchestrator = orchestrator;
+        this.resumeParserService = resumeParserService;
         this.devMode = devMode;
     }
 
@@ -55,15 +67,76 @@ public class InterviewController {
     public SessionResponse createSession(@RequestBody CreateSessionRequest req) {
         Session session = sessionService.createSession("anonymous", req.type(), req.role());
 
+        // Initialize interview context for state tracking
+        DifficultyLevel difficulty = mapRoleToDifficulty(req.role());
+        orchestrator.startInterview(session.getId(), difficulty, req.type());
+
         // Add greeting message
-        String greeting = String.format(
-            "Hello! I'm your PrepLit interviewer for today's %s interview. " +
-            "Could you please introduce yourself briefly?",
-            req.type()
-        );
+        String greeting = getGreetingForType(req.type());
         sessionService.addMessage(session.getId(), MessageRole.ASSISTANT, greeting);
 
         return new SessionResponse(session.getId(), session.getType(), session.getRole(), session.getStatus().name());
+    }
+
+    @PostMapping(value = "/sessions/with-resume", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Mono<SessionResponse> createSessionWithResume(
+            @RequestPart("type") String typeStr,
+            @RequestPart("role") String roleStr,
+            @RequestPart("resume") FilePart resumeFile) {
+
+        InterviewType type = InterviewType.valueOf(typeStr);
+        SdeRole role = SdeRole.valueOf(roleStr);
+
+        if (type != InterviewType.RESUME_GRILLING) {
+            throw new IllegalArgumentException("Resume upload only supported for RESUME_GRILLING interviews");
+        }
+
+        return resumeParserService.extractText(resumeFile)
+                .map(resumeText -> {
+                    // Create session with resume
+                    Session session = sessionService.createSessionWithResume("anonymous", type, role, resumeText);
+
+                    // Initialize interview context with resume
+                    DifficultyLevel difficulty = mapRoleToDifficulty(role);
+                    InterviewContext context = orchestrator.startInterview(session.getId(), difficulty, type);
+                    context.setResumeText(resumeText);
+                    orchestrator.saveContext(context);
+
+                    // Custom greeting for resume grilling
+                    String greeting = "Hello! I've reviewed your resume. Let's dive in. Tell me briefly about your current role and what you've been working on recently.";
+                    sessionService.addMessage(session.getId(), MessageRole.ASSISTANT, greeting);
+
+                    return new SessionResponse(session.getId(), session.getType(), session.getRole(), session.getStatus().name());
+                })
+                .onErrorMap(e -> new RuntimeException("Failed to parse resume: " + e.getMessage(), e));
+    }
+
+    private String getGreetingForType(InterviewType type) {
+        return switch (type) {
+            case CULTURE_FIT -> "Hello! I'm your PrepLit interviewer for today's culture fit interview. Let's start with you telling me a bit about yourself and what you're looking for in your next role.";
+            default -> String.format(
+                "Hello! I'm your PrepLit interviewer for today's %s interview. Let's begin with the problem.",
+                getTypeDisplayName(type)
+            );
+        };
+    }
+
+    private String getTypeDisplayName(InterviewType type) {
+        return switch (type) {
+            case DSA -> "DSA";
+            case HLD -> "system design";
+            case LLD -> "low-level design";
+            case RESUME_GRILLING -> "resume";
+            case CULTURE_FIT -> "culture fit";
+        };
+    }
+
+    private DifficultyLevel mapRoleToDifficulty(SdeRole role) {
+        return switch (role) {
+            case SDE1 -> DifficultyLevel.EASY;
+            case SDE2 -> DifficultyLevel.MEDIUM;
+            case SDE3 -> DifficultyLevel.HARD;
+        };
     }
 
     @PostMapping(value = "/sessions/{id}/messages", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -84,8 +157,19 @@ public class InterviewController {
         Session session = sessionService.getSession(id);
         List<Message> history = sessionService.getHistory(id);
 
+        // Update interview state asynchronously (doesn't block response)
+        InterviewContext context = orchestrator.getContext(id);
+        if (context != null) {
+            orchestrator.processCandidateResponseAsync(id, req.content());
+        }
+
         if (devMode) {
             log.info("History size: {}", history.size());
+            if (context != null) {
+                log.info("Interview State: {}", context.getInterviewerState());
+                log.info("Phase: {}", context.getCurrentPhase());
+                log.info("Scores: {}", context.getScores().totalScore());
+            }
             for (Message msg : history) {
                 log.info("  [{}]: {}", msg.getRole(), msg.getContent().substring(0, Math.min(100, msg.getContent().length())) + "...");
             }
@@ -101,7 +185,7 @@ public class InterviewController {
             ragContext = "";
         }
 
-        String systemPrompt = promptBuilder.build(session.getType(), session.getRole(), ragContext);
+        String systemPrompt = interviewPromptService.buildInterviewerPrompt(session.getType(), session.getRole(), ragContext, context);
 
         if (devMode) {
             log.info("System prompt length: {} chars", systemPrompt.length());
@@ -226,4 +310,42 @@ public class InterviewController {
         return new SessionWithMessagesResponse(session.getId(), session.getType(), session.getRole(),
                 session.getStatus().name(), messageResponses);
     }
+
+    @PostMapping("/sessions/{id}/end")
+    public FeedbackResponse endInterview(@PathVariable UUID id) {
+        FeedbackReport feedback = orchestrator.endInterview(id);
+        return new FeedbackResponse(
+            feedback.summary(),
+            feedback.strengths(),
+            feedback.weaknesses(),
+            feedback.verdict().name(),
+            feedback.nextSteps(),
+            new ScoresResponse(
+                feedback.scores().problemUnderstanding(),
+                feedback.scores().approach(),
+                feedback.scores().correctness(),
+                feedback.scores().communication(),
+                feedback.scores().optimization(),
+                feedback.scores().totalScore()
+            )
+        );
+    }
+
+    record FeedbackResponse(
+        String summary,
+        List<String> strengths,
+        List<String> weaknesses,
+        String verdict,
+        List<String> nextSteps,
+        ScoresResponse scores
+    ) {}
+
+    record ScoresResponse(
+        int problemUnderstanding,
+        int approach,
+        int correctness,
+        int communication,
+        int optimization,
+        int total
+    ) {}
 }

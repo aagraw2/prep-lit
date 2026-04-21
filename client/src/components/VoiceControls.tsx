@@ -6,6 +6,7 @@ interface VoiceControlsProps {
   onSubmit: (text: string) => void
   onHint: () => void
   disabled?: boolean
+  hintDisabled?: boolean
   isSpeaking?: boolean
 }
 
@@ -14,7 +15,20 @@ interface AudioDevice {
   label: string
 }
 
-export function VoiceControls({ onSubmit, onHint, disabled, isSpeaking }: VoiceControlsProps) {
+const colors = {
+  primary: '#1a1d29',
+  secondary: '#252936',
+  accent: '#D4A574',
+  accentDark: '#C89850',
+  text: '#e8eaed',
+  textMuted: '#9aa0a6',
+  border: '#3c4043',
+  success: '#81c995',
+  error: '#f28b82',
+  warning: '#fdd663',
+}
+
+export function VoiceControls({ onSubmit, onHint, disabled, hintDisabled, isSpeaking }: VoiceControlsProps) {
   const { transcript, isListening, start, stop, clearTranscript } = useSpeechToText()
   const { isMuted, toggleMute } = useTextToSpeech()
   const wasListeningRef = useRef(false)
@@ -128,17 +142,18 @@ export function VoiceControls({ onSubmit, onHint, disabled, isSpeaking }: VoiceC
       {/* Transcript display */}
       <div style={{
         padding: '16px 20px',
-        background: isListening ? '#fef3c7' : '#f9fafb',
-        borderRadius: '16px',
-        border: isListening ? '2px solid #f59e0b' : '2px solid #e5e7eb',
+        background: isListening ? colors.secondary : colors.primary,
+        borderRadius: '12px',
+        border: isListening ? `2px solid ${colors.accent}` : `1px solid ${colors.border}`,
         minHeight: '60px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: transcript ? '#1a1a2e' : '#9ca3af',
-        fontSize: '16px',
+        color: transcript ? colors.text : colors.textMuted,
+        fontSize: '15px',
         textAlign: 'center',
         transition: 'all 0.2s ease',
+        boxShadow: isListening ? `0 0 20px rgba(212, 165, 116, 0.2)` : 'none',
       }}>
         {transcript || (isListening ? '🎙️ Listening... Speak now!' : 'Click the microphone to start speaking')}
       </div>
@@ -157,9 +172,9 @@ export function VoiceControls({ onSubmit, onHint, disabled, isSpeaking }: VoiceC
             width: '50px',
             height: '50px',
             borderRadius: '50%',
-            border: 'none',
-            background: isMuted ? '#fef2f2' : '#f0fdf4',
-            color: isMuted ? '#dc2626' : '#16a34a',
+            border: `1px solid ${colors.border}`,
+            background: colors.secondary,
+            color: isMuted ? colors.error : colors.success,
             fontSize: '22px',
             cursor: 'pointer',
             display: 'flex',
@@ -182,11 +197,11 @@ export function VoiceControls({ onSubmit, onHint, disabled, isSpeaking }: VoiceC
             borderRadius: '50%',
             border: 'none',
             background: disabled
-              ? '#e5e7eb'
+              ? colors.border
               : isListening
-                ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
+                ? `linear-gradient(135deg, ${colors.error} 0%, #dc2626 100%)`
+                : `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
+            color: disabled ? colors.textMuted : colors.primary,
             fontSize: '32px',
             cursor: disabled ? 'not-allowed' : 'pointer',
             display: 'flex',
@@ -195,8 +210,8 @@ export function VoiceControls({ onSubmit, onHint, disabled, isSpeaking }: VoiceC
             boxShadow: disabled
               ? 'none'
               : isListening
-                ? '0 8px 25px rgba(239, 68, 68, 0.5)'
-                : '0 8px 25px rgba(102, 126, 234, 0.5)',
+                ? `0 8px 25px rgba(248, 113, 113, 0.4)`
+                : `0 8px 25px rgba(212, 165, 116, 0.4)`,
             transition: 'all 0.2s ease',
             animation: isListening ? 'pulse 1.5s infinite' : 'none',
           }}
@@ -208,22 +223,23 @@ export function VoiceControls({ onSubmit, onHint, disabled, isSpeaking }: VoiceC
         {/* Hint button */}
         <button
           onClick={onHint}
-          disabled={disabled}
+          disabled={hintDisabled}
           style={{
             width: '50px',
             height: '50px',
             borderRadius: '50%',
-            border: 'none',
-            background: disabled ? '#e5e7eb' : '#fef3c7',
-            color: disabled ? '#9ca3af' : '#d97706',
+            border: `1px solid ${colors.border}`,
+            background: hintDisabled ? colors.border : colors.secondary,
+            color: hintDisabled ? colors.textMuted : colors.warning,
             fontSize: '22px',
-            cursor: disabled ? 'not-allowed' : 'pointer',
+            cursor: hintDisabled ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             transition: 'all 0.2s ease',
+            opacity: hintDisabled ? 0.5 : 1,
           }}
-          title="Get a hint"
+          title={hintDisabled ? "Wait for interviewer's question first" : "Get a hint"}
         >
           💡
         </button>
@@ -236,7 +252,7 @@ export function VoiceControls({ onSubmit, onHint, disabled, isSpeaking }: VoiceC
         justifyContent: 'center',
         gap: '8px',
         fontSize: '13px',
-        color: micError ? '#dc2626' : '#6b7280',
+        color: micError ? colors.error : colors.textMuted,
       }}>
         {micError ? (
           <span>Mic error: {micError}</span>
@@ -246,14 +262,14 @@ export function VoiceControls({ onSubmit, onHint, disabled, isSpeaking }: VoiceC
             <div style={{
               width: '100px',
               height: '8px',
-              background: '#e5e7eb',
+              background: colors.border,
               borderRadius: '4px',
               overflow: 'hidden',
             }}>
               <div style={{
                 width: `${Math.min(micLevel * 2, 100)}%`,
                 height: '100%',
-                background: micLevel > 10 ? '#22c55e' : '#9ca3af',
+                background: micLevel > 10 ? colors.success : colors.textMuted,
                 transition: 'width 0.1s',
               }} />
             </div>
@@ -272,17 +288,17 @@ export function VoiceControls({ onSubmit, onHint, disabled, isSpeaking }: VoiceC
           fontSize: '13px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#6b7280' }}>Microphone:</span>
+            <span style={{ color: colors.textMuted }}>Microphone:</span>
             <select
               value={selectedDeviceId}
               onChange={(e) => setSelectedDeviceId(e.target.value)}
               style={{
-                padding: '4px 8px',
+                padding: '6px 10px',
                 fontSize: '13px',
-                border: '1px solid #e5e7eb',
+                border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
-                background: '#f9fafb',
-                color: '#374151',
+                background: colors.primary,
+                color: colors.text,
                 maxWidth: '200px',
               }}
             >
@@ -293,7 +309,7 @@ export function VoiceControls({ onSubmit, onHint, disabled, isSpeaking }: VoiceC
               ))}
             </select>
           </div>
-          <span style={{ color: '#9ca3af', fontSize: '11px' }}>
+          <span style={{ color: colors.textMuted, fontSize: '11px' }}>
             Speech uses system default. Change in System Settings → Sound if needed.
           </span>
         </div>
@@ -303,7 +319,7 @@ export function VoiceControls({ onSubmit, onHint, disabled, isSpeaking }: VoiceC
       <div style={{
         textAlign: 'center',
         fontSize: '13px',
-        color: '#6b7280',
+        color: colors.textMuted,
       }}>
         {isSpeaking
           ? 'AI is speaking...'

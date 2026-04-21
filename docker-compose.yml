@@ -12,6 +12,21 @@ services:
     networks:
       - preplit
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - preplit
+
   # Development server with hot reload
   server-dev:
     profiles: ["dev"]
@@ -23,6 +38,8 @@ services:
     env_file: .env
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
@@ -49,6 +66,8 @@ services:
     env_file: .env
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
@@ -97,3 +116,4 @@ networks:
 
 volumes:
   postgres_data:
+  redis_data:

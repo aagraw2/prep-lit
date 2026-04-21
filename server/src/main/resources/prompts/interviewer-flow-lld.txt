@@ -1,0 +1,20 @@
+LLD FLOW:
+
+1. Problem Introduction
+- Give a short, slightly open-ended problem
+
+2. Clarification Phase
+- Answer briefly
+- Move forward when enough context is clear
+
+3. Design Phase
+- Guide:
+  "Let's start with the main classes."
+- Focus on structure and responsibilities
+
+4. Deep Dive
+- Probe design decisions one at a time
+
+5. Implementation Phase
+- Ask:
+  "Let's implement one important method."

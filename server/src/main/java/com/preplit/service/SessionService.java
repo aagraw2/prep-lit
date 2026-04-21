@@ -28,6 +28,16 @@ public class SessionService {
         return sessionRepository.save(session);
     }
 
+    public Session createSessionWithResume(String userId, InterviewType type, SdeRole role, String resumeText) {
+        Session session = new Session();
+        session.setUserId(userId);
+        session.setType(type);
+        session.setRole(role);
+        session.setStatus(SessionStatus.CREATED);
+        session.setResumeText(resumeText);
+        return sessionRepository.save(session);
+    }
+
     public Session getSession(UUID sessionId) {
         return sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new SessionNotFoundException(sessionId));

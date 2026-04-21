@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { InterviewType, SdeRole } from '../types'
-import { createSession, sendMessage, getSession } from '../api/client'
+import { InterviewType, SdeRole, FeedbackReport } from '../types'
+import { createSession, createSessionWithResume, sendMessage, getSession, endInterview } from '../api/client'
 import { useTextToSpeech } from '../hooks/useTextToSpeech'
 import { MessageList } from './MessageList'
 import { VoiceControls } from './VoiceControls'
+import { FeedbackModal } from './FeedbackModal'
 
 type LocalMessage = { role: 'USER' | 'ASSISTANT'; content: string }
 
@@ -11,13 +12,40 @@ const interviewTypeLabels: Record<InterviewType, string> = {
   DSA: 'Data Structures & Algorithms',
   HLD: 'High Level Design',
   LLD: 'Low Level Design',
+  RESUME_GRILLING: 'Resume Deep Dive',
+  CULTURE_FIT: 'Culture Fit & Behavioral',
 }
 
 const roleLabels: Record<SdeRole, string> = {
-  SDE1: 'Junior Engineer (SDE1)',
-  SDE2: 'Mid-Level Engineer (SDE2)',
-  SDE3: 'Senior Engineer (SDE3)',
+  SDE1: 'Junior Engineer',
+  SDE2: 'Mid-Level Engineer',
+  SDE3: 'Senior Engineer',
 }
+
+// Futuristic color palette
+const colors = {
+  primary: '#1a1d29',
+  secondary: '#252936',
+  accent: '#D4A574',
+  accentDark: '#C89850',
+  text: '#e8eaed',
+  textMuted: '#9aa0a6',
+  border: '#3c4043',
+  success: '#81c995',
+  error: '#f28b82',
+}
+
+const Logo = ({ size = 40 }: { size?: number }) => (
+  <img 
+    src="/logo.png" 
+    alt="PrepLit Logo" 
+    style={{ 
+      width: size, 
+      height: size,
+      objectFit: 'contain'
+    }} 
+  />
+)
 
 export function InterviewSession() {
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -26,17 +54,53 @@ export function InterviewSession() {
   const [messages, setMessages] = useState<LocalMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
+  const [assistantHasResponded, setAssistantHasResponded] = useState(false)
+  const [feedback, setFeedback] = useState<FeedbackReport | null>(null)
+  const [isEndingInterview, setIsEndingInterview] = useState(false)
+  const [resumeFile, setResumeFile] = useState<File | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const tts = useTextToSpeech()
+
+  const showResumeUpload = interviewType === 'RESUME_GRILLING'
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        setUploadError('Please upload a PDF file')
+        setResumeFile(null)
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError('File size must be less than 5MB')
+        setResumeFile(null)
+        return
+      }
+      setUploadError(null)
+      setResumeFile(file)
+    }
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   const handleStart = async () => {
+    if (interviewType === 'RESUME_GRILLING' && !resumeFile) {
+      setUploadError('Please upload your resume')
+      return
+    }
+
     setIsStarting(true)
     try {
-      const session = await createSession(interviewType, sdeRole)
+      let session
+      if (interviewType === 'RESUME_GRILLING' && resumeFile) {
+        session = await createSessionWithResume(interviewType, sdeRole, resumeFile)
+      } else {
+        session = await createSession(interviewType, sdeRole)
+      }
       const sessionWithMessages = await getSession(session.id)
       const existingMessages: LocalMessage[] = sessionWithMessages.messages
         .filter(m => m.role === 'USER' || m.role === 'ASSISTANT')
@@ -45,6 +109,7 @@ export function InterviewSession() {
       setSessionId(session.id)
       if (existingMessages.length > 0 && existingMessages[0].role === 'ASSISTANT') {
         tts.speak(existingMessages[0].content)
+        setAssistantHasResponded(true)
       }
     } finally {
       setIsStarting(false)
@@ -75,6 +140,7 @@ export function InterviewSession() {
         },
         () => {
           tts.speak(accumulated)
+          setAssistantHasResponded(true)
         },
       )
     } catch (error) {
@@ -94,6 +160,28 @@ export function InterviewSession() {
     handleSubmit("Can you give me a hint?")
   }
 
+  const handleEndInterview = async () => {
+    if (!sessionId) return
+    setIsEndingInterview(true)
+    try {
+      const feedbackReport = await endInterview(sessionId)
+      setFeedback(feedbackReport)
+    } catch (error) {
+      console.error('Failed to end interview:', error)
+      alert('Failed to get feedback. Please try again.')
+    } finally {
+      setIsEndingInterview(false)
+    }
+  }
+
+  const handleCloseFeedback = () => {
+    setFeedback(null)
+    // Optionally reset the session
+    setSessionId(null)
+    setMessages([])
+    setAssistantHasResponded(false)
+  }
+
   if (!sessionId) {
     return (
       <div style={{
@@ -102,89 +190,157 @@ export function InterviewSession() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
         padding: '20px',
       }}>
         <div style={{
-          background: 'white',
-          borderRadius: '24px',
+          background: colors.secondary,
+          borderRadius: '20px',
           padding: '48px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          maxWidth: '420px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 1px rgba(212, 165, 116, 0.3)',
+          maxWidth: '440px',
           width: '100%',
+          border: `1px solid ${colors.border}`,
         }}>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          {/* Logo and Title */}
+          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
             <div style={{
-              width: '72px',
-              height: '72px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              borderRadius: '16px',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto 16px',
-              fontSize: '32px',
+              marginBottom: '20px',
             }}>
-              💼
+              <Logo size={80} />
             </div>
             <h1 style={{
-              fontSize: '28px',
+              fontSize: '48px',
               fontWeight: '700',
-              color: '#1a1a2e',
+              background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
               margin: '0 0 8px',
-            }}>PrepLit</h1>
+              letterSpacing: '-1px',
+              fontFamily: 'Georgia, serif',
+            }}>
+              prep<span style={{ fontWeight: '400' }}>LIT</span>
+            </h1>
             <p style={{
-              color: '#6b7280',
-              fontSize: '15px',
+              color: colors.accent,
+              fontSize: '13px',
               margin: 0,
-            }}>Your AI-powered interview coach</p>
+              letterSpacing: '2px',
+              textTransform: 'uppercase',
+              fontWeight: '600',
+            }}>Igniting Interview Success</p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Interview Type */}
             <div>
               <label style={{
                 display: 'block',
-                fontSize: '13px',
+                fontSize: '12px',
                 fontWeight: '600',
-                color: '#374151',
-                marginBottom: '8px',
+                color: colors.textMuted,
+                marginBottom: '10px',
                 textTransform: 'uppercase',
-                letterSpacing: '0.5px',
+                letterSpacing: '1px',
               }}>
                 Interview Type
               </label>
               <select
                 value={interviewType}
-                onChange={e => setInterviewType(e.target.value as InterviewType)}
+                onChange={e => {
+                  setInterviewType(e.target.value as InterviewType)
+                  setResumeFile(null)
+                  setUploadError(null)
+                }}
                 style={{
                   display: 'block',
                   width: '100%',
                   padding: '14px 16px',
                   fontSize: '15px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '12px',
-                  background: '#f9fafb',
-                  color: '#1a1a2e',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '10px',
+                  background: colors.primary,
+                  color: colors.text,
                   cursor: 'pointer',
                   outline: 'none',
-                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                  transition: 'all 0.2s',
+                  fontWeight: '500',
                 }}
+                onFocus={(e) => e.target.style.borderColor = colors.accent}
+                onBlur={(e) => e.target.style.borderColor = colors.border}
               >
                 <option value="DSA">{interviewTypeLabels.DSA}</option>
                 <option value="HLD">{interviewTypeLabels.HLD}</option>
                 <option value="LLD">{interviewTypeLabels.LLD}</option>
+                <option value="RESUME_GRILLING">{interviewTypeLabels.RESUME_GRILLING}</option>
+                <option value="CULTURE_FIT">{interviewTypeLabels.CULTURE_FIT}</option>
               </select>
             </div>
 
+            {/* Resume Upload (shown only for RESUME_GRILLING) */}
+            {showResumeUpload && (
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: colors.textMuted,
+                  marginBottom: '10px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                }}>
+                  Upload Resume (PDF)
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                />
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    padding: '16px',
+                    border: `2px dashed ${uploadError ? colors.error : resumeFile ? colors.success : colors.border}`,
+                    borderRadius: '10px',
+                    background: colors.primary,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!resumeFile) e.currentTarget.style.borderColor = colors.accent
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!resumeFile && !uploadError) e.currentTarget.style.borderColor = colors.border
+                  }}
+                >
+                  {resumeFile ? (
+                    <span style={{ color: colors.success, fontWeight: '500' }}>{resumeFile.name}</span>
+                  ) : (
+                    <span style={{ color: colors.textMuted }}>Click to upload PDF</span>
+                  )}
+                </div>
+                {uploadError && (
+                  <p style={{ color: colors.error, fontSize: '12px', marginTop: '8px', marginBottom: 0 }}>{uploadError}</p>
+                )}
+              </div>
+            )}
+
+            {/* Experience Level */}
             <div>
               <label style={{
                 display: 'block',
-                fontSize: '13px',
+                fontSize: '12px',
                 fontWeight: '600',
-                color: '#374151',
-                marginBottom: '8px',
+                color: colors.textMuted,
+                marginBottom: '10px',
                 textTransform: 'uppercase',
-                letterSpacing: '0.5px',
+                letterSpacing: '1px',
               }}>
                 Experience Level
               </label>
@@ -196,14 +352,17 @@ export function InterviewSession() {
                   width: '100%',
                   padding: '14px 16px',
                   fontSize: '15px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '12px',
-                  background: '#f9fafb',
-                  color: '#1a1a2e',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '10px',
+                  background: colors.primary,
+                  color: colors.text,
                   cursor: 'pointer',
                   outline: 'none',
-                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                  transition: 'all 0.2s',
+                  fontWeight: '500',
                 }}
+                onFocus={(e) => e.target.style.borderColor = colors.accent}
+                onBlur={(e) => e.target.style.borderColor = colors.border}
               >
                 <option value="SDE1">{roleLabels.SDE1}</option>
                 <option value="SDE2">{roleLabels.SDE2}</option>
@@ -211,6 +370,7 @@ export function InterviewSession() {
               </select>
             </div>
 
+            {/* Start Button */}
             <button
               onClick={handleStart}
               disabled={isStarting}
@@ -219,29 +379,40 @@ export function InterviewSession() {
                 padding: '16px 24px',
                 fontSize: '16px',
                 fontWeight: '600',
-                color: 'white',
+                color: colors.primary,
                 background: isStarting
-                  ? '#9ca3af'
-                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  ? colors.textMuted
+                  : `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
                 border: 'none',
-                borderRadius: '12px',
+                borderRadius: '10px',
                 cursor: isStarting ? 'not-allowed' : 'pointer',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                boxShadow: '0 4px 14px 0 rgba(102, 126, 234, 0.4)',
+                transition: 'all 0.2s',
+                boxShadow: isStarting ? 'none' : `0 4px 20px rgba(212, 165, 116, 0.3)`,
+                letterSpacing: '0.5px',
+              }}
+              onMouseEnter={(e) => {
+                if (!isStarting) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = `0 6px 25px rgba(212, 165, 116, 0.4)`
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = isStarting ? 'none' : `0 4px 20px rgba(212, 165, 116, 0.3)`
               }}
             >
-              {isStarting ? 'Starting...' : 'Start Interview'}
+              {isStarting ? 'Initializing...' : 'Start Interview'}
             </button>
           </div>
 
           <p style={{
             textAlign: 'center',
-            fontSize: '13px',
-            color: '#9ca3af',
-            marginTop: '24px',
+            fontSize: '12px',
+            color: colors.textMuted,
+            marginTop: '32px',
             marginBottom: 0,
           }}>
-            Practice makes perfect. Good luck!
+            Practice makes perfect. Good luck! 🔥
           </p>
         </div>
       </div>
@@ -253,44 +424,74 @@ export function InterviewSession() {
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
-      background: '#f3f4f6',
+      background: colors.primary,
     }}>
       {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: colors.secondary,
         padding: '16px 24px',
         display: 'flex',
         alignItems: 'center',
-        gap: '12px',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+        justifyContent: 'space-between',
+        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
+        borderBottom: `1px solid ${colors.border}`,
       }}>
-        <div style={{
-          width: '40px',
-          height: '40px',
-          background: 'rgba(255,255,255,0.2)',
-          borderRadius: '10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '20px',
-        }}>
-          💼
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <Logo size={40} />
+          <div>
+            <h1 style={{
+              margin: 0,
+              fontSize: '20px',
+              fontWeight: '700',
+              background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.5px',
+              fontFamily: 'Georgia, serif',
+            }}>
+              prep<span style={{ fontWeight: '400' }}>LIT</span>
+            </h1>
+            <p style={{
+              margin: 0,
+              fontSize: '12px',
+              color: colors.textMuted,
+              fontWeight: '500',
+            }}>
+              {interviewTypeLabels[interviewType]} • {roleLabels[sdeRole]}
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 style={{
-            margin: 0,
-            fontSize: '18px',
+        <button
+          onClick={handleEndInterview}
+          disabled={isEndingInterview || isStreaming}
+          style={{
+            padding: '10px 20px',
+            fontSize: '14px',
             fontWeight: '600',
-            color: 'white',
-          }}>PrepLit Interview</h1>
-          <p style={{
-            margin: 0,
-            fontSize: '13px',
-            color: 'rgba(255,255,255,0.8)',
-          }}>
-            {interviewTypeLabels[interviewType]} • {roleLabels[sdeRole]}
-          </p>
-        </div>
+            color: colors.primary,
+            background: isEndingInterview || isStreaming 
+              ? colors.textMuted 
+              : `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
+            border: 'none',
+            borderRadius: '8px',
+            cursor: isEndingInterview || isStreaming ? 'not-allowed' : 'pointer',
+            opacity: isEndingInterview || isStreaming ? 0.5 : 1,
+            transition: 'all 0.2s',
+            letterSpacing: '0.3px',
+          }}
+          onMouseEnter={(e) => {
+            if (!isEndingInterview && !isStreaming) {
+              e.currentTarget.style.transform = 'translateY(-1px)'
+              e.currentTarget.style.boxShadow = `0 4px 12px rgba(212, 165, 116, 0.3)`
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = 'none'
+          }}
+        >
+          {isEndingInterview ? 'Ending...' : 'End Interview'}
+        </button>
       </div>
 
       {/* Messages */}
@@ -299,13 +500,24 @@ export function InterviewSession() {
 
       {/* Input */}
       <div style={{
-        borderTop: '1px solid #e5e7eb',
-        padding: '16px 24px',
-        background: 'white',
-        boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.05)',
+        borderTop: `1px solid ${colors.border}`,
+        padding: '20px 24px',
+        background: colors.secondary,
+        boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.2)',
       }}>
-        <VoiceControls onSubmit={handleSubmit} onHint={handleHint} disabled={isStreaming || tts.isSpeaking} isSpeaking={tts.isSpeaking} />
+        <VoiceControls 
+          onSubmit={handleSubmit} 
+          onHint={handleHint} 
+          disabled={isStreaming || tts.isSpeaking} 
+          hintDisabled={!assistantHasResponded || isStreaming || tts.isSpeaking}
+          isSpeaking={tts.isSpeaking} 
+        />
       </div>
+
+      {/* Feedback Modal */}
+      {feedback && (
+        <FeedbackModal feedback={feedback} onClose={handleCloseFeedback} />
+      )}
     </div>
   )
 }

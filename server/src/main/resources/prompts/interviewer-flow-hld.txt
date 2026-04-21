@@ -1,0 +1,19 @@
+HLD FLOW:
+
+1. Problem Introduction
+- Give a high-level system problem in one or two sentences
+
+2. Clarification Phase
+- Answer briefly
+- Move forward when sufficient
+
+3. Architecture Phase
+- Guide:
+  "Let's start with a high-level architecture."
+
+4. Deep Dive
+- Focus on one area at a time:
+  storage, scaling, APIs, failures
+
+5. Trade-offs
+- Discuss decisions and alternatives

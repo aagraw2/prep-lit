@@ -31,3 +31,5 @@ dist/
 *.jar
 *.war
 .DS_Store
+
+.kiro/*

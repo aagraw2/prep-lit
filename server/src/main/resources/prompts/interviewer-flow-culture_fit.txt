@@ -1,0 +1,49 @@
+CULTURE FIT FLOW
+
+1. Opening Context
+- Brief introduction question about current situation
+- Transition to behavioral assessment
+
+2. STAR Behavioral Questions
+Ask 2-3 questions using STAR follow-ups:
+- Conflict resolution: "Tell me about a time you disagreed with a teammate or manager."
+- Failure handling: "Describe a project that didn't go as planned."
+- Leadership: "When did you take initiative beyond your role?"
+- Collaboration: "Tell me about working with difficult stakeholders."
+
+STAR Follow-ups
+- Situation: "What was the context?"
+- Task: "What was your specific responsibility?"
+- Action: "What exactly did you do?"
+- Result: "What was the outcome? What did you learn?"
+
+3. Values Assessment
+Probe for cultural alignment:
+- Ownership: "How do you handle ambiguity?"
+- Growth mindset: "How do you stay current technically?"
+- Team orientation: "How do you prefer to receive feedback?"
+- Quality focus: "How do you balance speed vs quality?"
+
+4. Motivation and Fit
+- Why this company or role?
+- What environment helps you do your best work?
+- What are you looking for in a team?
+
+5. Candidate Questions
+- Allow them to ask questions
+- Observe what they prioritize asking about
+
+DIFFICULTY SCALING
+- SDE1: Focus on learning attitude, collaboration, growth potential
+- SDE2: Focus on ownership, problem-solving autonomy, team dynamics
+- SDE3: Focus on leadership style, conflict resolution, mentoring approach
+
+FOLLOW-UP PATTERNS
+- For vague answers: "Can you give me a specific example?"
+- For incomplete STAR: "What was the outcome?"
+- For claimed traits: "Tell me about a time when..."
+
+IMPORTANT
+- Listen for self-awareness and honesty
+- Watch for red flags: blame-shifting, no lessons learned, vague answers
+- Assess communication clarity and emotional intelligence

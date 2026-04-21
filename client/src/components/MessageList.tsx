@@ -4,6 +4,17 @@ interface MessageListProps {
   messages: Pick<Message, 'role' | 'content'>[]
 }
 
+const colors = {
+  primary: '#1a1d29',
+  secondary: '#252936',
+  accent: '#D4A574',
+  accentDark: '#C89850',
+  text: '#e8eaed',
+  textMuted: '#9aa0a6',
+  border: '#3c4043',
+  userBubble: '#2d3142',
+}
+
 export function MessageList({ messages }: MessageListProps) {
   return (
     <div style={{
@@ -13,7 +24,7 @@ export function MessageList({ messages }: MessageListProps) {
       display: 'flex',
       flexDirection: 'column',
       gap: '16px',
-      background: '#f3f4f6',
+      background: colors.primary,
     }}>
       {messages.length === 0 && (
         <div style={{
@@ -21,10 +32,11 @@ export function MessageList({ messages }: MessageListProps) {
           alignItems: 'center',
           justifyContent: 'center',
           height: '100%',
-          color: '#9ca3af',
+          color: colors.textMuted,
           fontSize: '15px',
+          fontWeight: '500',
         }}>
-          Starting your interview session...
+          Initializing interview session...
         </div>
       )}
       {messages.map((msg, i) => (
@@ -34,22 +46,23 @@ export function MessageList({ messages }: MessageListProps) {
             display: 'flex',
             justifyContent: msg.role === 'USER' ? 'flex-end' : 'flex-start',
             alignItems: 'flex-end',
-            gap: '8px',
+            gap: '10px',
           }}
         >
           {msg.role === 'ASSISTANT' && (
             <div style={{
-              width: '32px',
-              height: '32px',
+              width: '36px',
+              height: '36px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '14px',
+              fontSize: '16px',
               flexShrink: 0,
+              boxShadow: `0 2px 8px rgba(212, 165, 116, 0.3)`,
             }}>
-              🤖
+              🔥
             </div>
           )}
           <div
@@ -57,33 +70,32 @@ export function MessageList({ messages }: MessageListProps) {
               maxWidth: '70%',
               padding: '14px 18px',
               borderRadius: msg.role === 'USER'
-                ? '20px 20px 4px 20px'
-                : '20px 20px 20px 4px',
+                ? '16px 16px 4px 16px'
+                : '16px 16px 16px 4px',
               background: msg.role === 'USER'
-                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                : 'white',
-              color: msg.role === 'USER' ? 'white' : '#1a1a2e',
+                ? colors.userBubble
+                : colors.secondary,
+              color: colors.text,
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               fontSize: '15px',
-              lineHeight: '1.5',
-              boxShadow: msg.role === 'USER'
-                ? '0 4px 14px 0 rgba(102, 126, 234, 0.3)'
-                : '0 2px 8px rgba(0, 0, 0, 0.08)',
+              lineHeight: '1.6',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+              border: `1px solid ${colors.border}`,
             }}
           >
             {msg.content}
           </div>
           {msg.role === 'USER' && (
             <div style={{
-              width: '32px',
-              height: '32px',
+              width: '36px',
+              height: '36px',
               borderRadius: '50%',
-              background: '#e5e7eb',
+              background: colors.border,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '14px',
+              fontSize: '16px',
               flexShrink: 0,
             }}>
               👤

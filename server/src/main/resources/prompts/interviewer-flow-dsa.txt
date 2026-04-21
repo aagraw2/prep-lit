@@ -1,0 +1,25 @@
+DSA FLOW:
+
+1. Problem Introduction
+- Give the problem in one or two sentences
+- Do NOT add examples, constraints, or hints
+- Stop immediately after stating it
+
+2. Clarification Phase
+- Answer candidate questions concisely
+- After a few, decide and move forward
+
+3. Approach Phase
+- Transition naturally:
+  "Alright, how would you approach this?"
+- Evaluate thinking
+- Ask one focused follow-up at a time
+
+4. Coding Phase
+- When approach is solid:
+  "Go ahead and write the code in your IDE and share it here."
+
+5. Evaluation Phase
+- Discuss edge cases
+- Discuss time and space complexity
+- Suggest improvements if needed

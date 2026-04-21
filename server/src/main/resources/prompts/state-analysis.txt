@@ -1,0 +1,75 @@
+Analyze this candidate's response in a technical interview.
+
+CANDIDATE RESPONSE:
+"{{candidateInput}}"
+
+CONTEXT:
+- phase: {{phase}}
+- stuckTurns: {{stuckTurns}}
+- consecutiveIdk: {{consecutiveIdk}}
+- clarificationQuestions: {{clarificationQuestions}}
+- confidence: {{confidence}}
+- engagement: {{engagement}}
+- frustration: {{frustration}}
+- scoreProblem: {{scoreProblem}}
+- scoreApproach: {{scoreApproach}}
+- scoreCorrectness: {{scoreCorrectness}}
+- scoreCommunication: {{scoreCommunication}}
+- scoreOptimization: {{scoreOptimization}}
+
+ANALYZE AND RESPOND WITH JSON:
+{
+  "interviewerState": "STUCK|PROGRESSING|DISENGAGED|EXPLORING|WRAPPING_UP",
+  "confidence": "LOW|MEDIUM|HIGH",
+  "engagement": "LOW|MEDIUM|HIGH",
+  "frustration": "LOW|MEDIUM|HIGH",
+  "isStuck": true|false,
+  "isProgressing": true|false,
+  "hasCorrectApproach": true|false,
+  "mentionsEdgeCases": true|false,
+  "hasCodePatterns": true|false,
+  "asksForAnswer": true|false,
+  "communicationQuality": "POOR|FAIR|GOOD|EXCELLENT",
+  "shouldTransitionPhase": true|false,
+  "suggestedPhase": "INTRO|CLARIFICATION|APPROACH|IMPLEMENTATION|DEEP_DIVE|WRAP_UP",
+  "scoreDeltas": {
+    "problemUnderstanding": -20 to +20,
+    "approach": -20 to +20,
+    "correctness": -20 to +20,
+    "communication": -20 to +20,
+    "optimization": -20 to +20
+  },
+  "reasoning": "brief explanation"
+}
+
+GUIDELINES:
+
+INTERVIEWER STATE:
+- STUCK: Says "I don't know", asks for help, makes no progress, repeats same ideas
+- PROGRESSING: Explains approach clearly, mentions algorithms/data structures, making progress
+- DISENGAGED: Very short response (< 10 words), minimal effort, uninterested tone
+- EXPLORING: Thinking through problem, asking questions, considering options
+- WRAPPING_UP: Interview ending, final questions
+
+CANDIDATE SIGNALS:
+- Confidence LOW: Uncertain, hesitant, says "not sure", "maybe", "I think"
+- Confidence HIGH: Decisive, explains clearly, confident in approach
+- Engagement LOW: Short responses, minimal detail, seems uninterested
+- Engagement HIGH: Detailed responses, asks questions, shows interest
+- Frustration HIGH: Repeated struggles, says "stuck", "confused", "frustrated"
+
+PHASE TRANSITIONS:
+- INTRO → CLARIFICATION: Candidate acknowledges problem, ready to ask questions
+- CLARIFICATION → APPROACH: Candidate starts describing solution approach
+- APPROACH → IMPLEMENTATION: Candidate ready to code or describe implementation
+- IMPLEMENTATION → DEEP_DIVE: Candidate completes implementation
+- DEEP_DIVE → WRAP_UP: Sufficient discussion of optimizations/tradeoffs
+
+SCORE DELTAS (how much to adjust each score):
+- problemUnderstanding: +10 for good clarifications/edge cases, -10 for missing them
+- approach: +15 for correct algorithm, -10 for vague/incorrect approach
+- correctness: +10 for working code/logic, -10 for bugs/errors
+- communication: +5 for clear explanation, -10 for very short/unclear responses
+- optimization: +15 for discussing complexity/tradeoffs, 0 if not relevant yet
+
+Respond with ONLY the JSON, no other text.
