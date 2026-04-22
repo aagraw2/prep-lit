@@ -32,6 +32,7 @@ ANALYZE AND RESPOND WITH JSON:
   "communicationQuality": "POOR|FAIR|GOOD|EXCELLENT",
   "shouldTransitionPhase": true|false,
   "suggestedPhase": "INTRO|CLARIFICATION|APPROACH|IMPLEMENTATION|DEEP_DIVE|WRAP_UP",
+  "chosenProblem": "exact problem/system name if the interviewer just introduced one, otherwise null",
   "scoreDeltas": {
     "problemUnderstanding": -20 to +20,
     "approach": -20 to +20,
@@ -60,10 +61,12 @@ CANDIDATE SIGNALS:
 
 PHASE TRANSITIONS:
 - INTRO → CLARIFICATION: Candidate acknowledges problem, ready to ask questions
-- CLARIFICATION → APPROACH: Candidate starts describing solution approach
-- APPROACH → IMPLEMENTATION: Candidate ready to code or describe implementation
-- IMPLEMENTATION → DEEP_DIVE: Candidate completes implementation
+- CLARIFICATION → APPROACH: Candidate starts describing solution approach, OR has identified core entities/classes (LLD), OR has described basic architecture components (HLD), OR has stated a reasonable algorithm direction (DSA). Do NOT stay in CLARIFICATION just because edge cases haven't been discussed — 2-3 clarification turns is enough.
+- APPROACH → IMPLEMENTATION: Candidate ready to code (DSA) or has walked through class/component design (LLD/HLD)
+- IMPLEMENTATION → DEEP_DIVE: Candidate completes implementation or detailed design
 - DEEP_DIVE → WRAP_UP: Sufficient discussion of optimizations/tradeoffs
+
+IMPORTANT: Bias toward transitioning forward. Staying too long in CLARIFICATION is a worse outcome than moving forward with incomplete requirements. If the candidate has given 2+ substantive responses in CLARIFICATION, transition to APPROACH.
 
 SCORE DELTAS (how much to adjust each score):
 - problemUnderstanding: +10 for good clarifications/edge cases, -10 for missing them

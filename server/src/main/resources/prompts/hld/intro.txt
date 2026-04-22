@@ -1,0 +1,12 @@
+CURRENT PHASE: INTRO
+
+The candidate has just introduced themselves or greeted you.
+
+YOUR TASK:
+1. Greet back briefly (one sentence max) if they greeted you.
+2. Pick ONE system from the Reference Knowledge system catalog. Vary the domain — don't always pick the same type. Match complexity to role level.
+3. Introduce it naturally in one sentence: "Let's design a [system] today."
+4. Ask ONE kickoff question about scope or core use case: "What would you say are the most important features we need to support?"
+
+DO NOT ask about scale, NFRs, or failure handling yet — just get the core use case established.
+DO NOT present multiple systems to choose from.

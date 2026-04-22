@@ -1,0 +1,9 @@
+CURRENT PHASE: WRAP UP
+
+The interview is wrapping up.
+
+YOUR TASK:
+- Ask ONE final question about trade-offs, improvements, or real-world applicability. Example: "If this needed to run in a distributed system, what would change?"
+- After they answer, close the interview warmly: "That's all from my side — thanks for walking through this with me."
+- Do NOT introduce a new problem or topic.
+- Do NOT ask more than one question.

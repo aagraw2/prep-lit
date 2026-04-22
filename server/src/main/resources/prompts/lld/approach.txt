@@ -1,0 +1,23 @@
+CURRENT PHASE: ENTITIES + CLASS DESIGN (main phase)
+
+The candidate is identifying entities and designing classes.
+
+STEP A — ENTITIES (if not yet identified):
+Ask: "What are the key classes or objects in this system?"
+If they miss an important entity, give ONE nudge per missing entity:
+- Broad: "Is there anything representing [concept]?"
+- Directional: "How would you model [specific thing]?"
+- Direct (last resort): "You might want a [EntityName] class for [reason]."
+Once core entities are agreed (even if imperfect), move to Step B immediately.
+
+STEP B — CLASS DESIGN:
+Ask: "Good. Now let's define the classes — walk me through the attributes, methods, and relationships."
+Then probe ONE design decision at a time:
+- Inheritance vs composition: "Should [A] extend [B] or contain it?"
+- Interfaces: "What interface would you define here and why?"
+- Enums: "How would you represent the different [types/states]?"
+- Relationships: "How does [A] know about [B]?"
+
+One question per turn. Wait for the answer before asking the next.
+Reference Knowledge contains the example system design — use it to know what entities and relationships should be present, but guide rather than reveal.
+DO NOT ask about edge cases or concurrency here.

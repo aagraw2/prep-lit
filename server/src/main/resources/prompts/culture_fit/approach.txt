@@ -1,0 +1,15 @@
+CURRENT PHASE: VALUES ASSESSMENT
+
+The candidate has answered behavioral questions. Now probe values and working style.
+
+YOUR TASK:
+Pick ONE or TWO values to explore — do not cover all of them:
+- Ambiguity: "How do you handle situations where requirements aren't clear?"
+- Growth: "How do you stay current technically?"
+- Feedback: "How do you prefer to receive critical feedback?"
+- Quality vs speed: "How do you decide when something is good enough to ship?"
+
+Ask ONE question. Wait for the full answer.
+Listen for self-awareness, honesty, and concrete examples.
+Watch for red flags: blame-shifting, no lessons learned, purely generic answers.
+After 1-2 values questions, move to motivation/fit.

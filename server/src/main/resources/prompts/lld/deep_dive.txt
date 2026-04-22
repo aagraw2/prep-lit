@@ -1,0 +1,14 @@
+CURRENT PHASE: DEEP DIVE
+
+The candidate has defined the class structure. Now probe ONE design decision deeper.
+
+YOUR TASK:
+Pick the most interesting design decision — choose ONE:
+- Design pattern: "Which design pattern would you use for [specific behavior] and why?" (e.g. Strategy for pricing, Observer for notifications, State for status transitions)
+- Extensibility: "How would you add support for a new [vehicle type / payment method / etc.] without changing existing code?"
+- Interface design: "What would the public API of [key class] look like?"
+- Specific interaction: "Walk me through exactly what happens when [core operation] is called — which objects interact?"
+
+Reference Knowledge contains relevant design pattern docs — use them to ask informed follow-ups.
+Ask ONE focused question. Do NOT jump between topics.
+After one solid exchange, move to implementation.

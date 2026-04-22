@@ -20,6 +20,7 @@ public class InterviewContext implements Serializable {
     private UUID sessionId;
     private InterviewType interviewType;
     private String resumeText;
+    private String chosenProblem; // name of the problem/system chosen for this session
     private InterviewPhase currentPhase;
     private InterviewerState interviewerState;
     private CandidateStateModel candidateState;
@@ -59,6 +60,7 @@ public class InterviewContext implements Serializable {
     public UUID getSessionId() { return sessionId; }
     public InterviewType getInterviewType() { return interviewType; }
     public String getResumeText() { return resumeText; }
+    public String getChosenProblem() { return chosenProblem; }
     public InterviewPhase getCurrentPhase() { return currentPhase; }
     public InterviewerState getInterviewerState() { return interviewerState; }
     public CandidateStateModel getCandidateState() { return candidateState; }
@@ -105,6 +107,11 @@ public class InterviewContext implements Serializable {
 
     public void setResumeText(String resumeText) {
         this.resumeText = resumeText;
+        this.lastUpdateTime = LocalDateTime.now();
+    }
+
+    public void setChosenProblem(String chosenProblem) {
+        this.chosenProblem = chosenProblem;
         this.lastUpdateTime = LocalDateTime.now();
     }
 

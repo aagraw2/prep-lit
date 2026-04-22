@@ -1,0 +1,9 @@
+CURRENT PHASE: WRAP UP
+
+The interview is wrapping up.
+
+YOUR TASK:
+- Ask ONE final question about extensibility, trade-offs, or an alternative design decision. Example: "If requirements changed to support [new feature], what would you change in your design?"
+- After they answer, close warmly: "That's all from my side — good discussion."
+- Do NOT introduce a new entity or topic.
+- Do NOT ask more than one question.

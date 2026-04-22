@@ -1,0 +1,13 @@
+CURRENT PHASE: INTRO
+
+The candidate has just introduced themselves or greeted you.
+
+YOUR TASK:
+1. Greet back briefly (one sentence max) if they greeted you.
+2. Pick ONE problem from the Reference Knowledge problem catalog. Vary by topic — arrays, strings, trees, graphs, DP, sliding window, two pointers, etc. Match difficulty to role level.
+3. State the problem clearly in one or two sentences. Sound natural, not robotic.
+4. End with: "Take a moment to think, and feel free to ask any clarifying questions."
+
+DO NOT ask a clarification question yourself yet — just present the problem.
+DO NOT explain the approach or give any hints.
+DO NOT pick the same category every time.

@@ -1,0 +1,14 @@
+CURRENT PHASE: TECHNICAL VALIDATION
+
+The candidate has walked through their projects. Now verify technical depth.
+
+YOUR TASK:
+- Pick ONE technology or technical claim from their resume to probe.
+- Ask ONE specific implementation question — not a broad "tell me about X":
+  - "You listed Kafka — how did you handle consumer lag in your setup?"
+  - "You mentioned Redis caching — what was your eviction strategy and why?"
+  - "You used microservices — how did you handle inter-service failures?"
+- If they answer well, ask ONE follow-up to go deeper.
+- If they're surface-level, probe once more: "Can you be more specific about how you implemented that?"
+- After 1-2 technical validation questions, move to wrap-up.
+- Do NOT quiz them on textbook definitions — focus on what they actually built.

@@ -12,12 +12,13 @@ PrepLit is a real-time AI-powered mock interview platform. It uses voice input, 
 - **Session/Message storage**: PostgreSQL (via Spring Data JPA)
 - **Interview state storage**: Redis (24h TTL) — `InterviewContext` lives here, NOT in Postgres
 - **Containerization**: Docker Compose
+- **RAG**: Redis Vector Search + LangChain4j embeddings (interview-guide submodule)
 
 ## Interview Types (enum `InterviewType`)
 - `DSA` — Data Structures & Algorithms
 - `HLD` — High Level System Design
 - `LLD` — Low Level Design
-- `RESUME_GRILLING` — Resume Deep Dive (requires PDF upload; resume text stored in Redis only)
+- `RESUME_GRILLING` — Resume Deep Dive (requires PDF upload; resume text stored in Redis + Postgres)
 - `CULTURE_FIT` — Culture Fit & Behavioral
 
 ## Roles (enum `SdeRole`): `SDE1`, `SDE2`, `SDE3`
@@ -44,7 +45,8 @@ prep-lit/
 └── server/src/main/java/com/preplit/
     ├── PrepLitApplication.java
     ├── config/
-    │   └── RedisConfig.java                  # RedisTemplate with Jackson JSON serializer
+    │   ├── RedisConfig.java                  # RedisTemplate + JedisPooled for vector search
+    │   └── EmbeddingConfig.java              # Provider-aware embedding model factory
     ├── controller/
     │   ├── InterviewController.java          # All REST endpoints + SSE streaming
     │   └── GlobalExceptionHandler.java       # @RestControllerAdvice error handling
@@ -55,8 +57,13 @@ prep-lit/
     │   ├── FeedbackGenerator.java            # Generates FeedbackReport from InterviewContext
     │   ├── ResumeParserService.java          # PDF → text via PDFBox; takes FilePart (reactive)
     │   ├── SessionService.java               # CRUD for Session + Message (Postgres)
-    │   ├── RAGService.java                   # Stub — always returns empty
+    │   ├── RAGService.java                   # Retrieves interview guide content via vector search
     │   └── SessionNotFoundException.java
+    ├── rag/
+    │   ├── DocumentChunk.java                # Record: chunk content + metadata + embedding
+    │   ├── InterviewGuideParser.java         # Parses interview-guide markdown into chunks
+    │   ├── InterviewGuideIndexer.java        # Async startup indexing with per-file hash diff + resume
+    │   └── RedisVectorStore.java             # Redis Vector Search operations (RediSearch)
     ├── model/
     │   ├── InterviewContext.java             # Full session state — stored in Redis
     │   ├── CandidateStateModel.java          # record: confidence, engagement, frustration, stuckTurns
@@ -103,7 +110,7 @@ All loaded by `InterviewPromptService` via `ClassPathResource`. Variables substi
 | `interviewer-state-context.txt` | Injected per-turn with live state; vars: phase, scores, hints, etc. |
 | `state-analysis.txt` | Prompt for `LLMStateAnalyzer` — expects JSON response |
 
-`InterviewPromptService.buildInterviewerPrompt()` assembles: system + flow + resume section (if RESUME_GRILLING) + state context + RAG (always empty).
+`InterviewPromptService.buildInterviewerPrompt()` assembles: system + flow + resume section (if RESUME_GRILLING) + state context + RAG context (from interview guide).
 
 ---
 
@@ -113,6 +120,7 @@ All loaded by `InterviewPromptService` via `ClassPathResource`. Variables substi
 |--------|----------|-------------|
 | POST | `/api/sessions` | Create session — body: `{type, role}` |
 | POST | `/api/sessions/with-resume` | Create session with PDF — `multipart/form-data`: `type`, `role`, `resume` (FilePart) |
+| GET | `/api/sessions` | List all sessions (with saved feedback if present) |
 | GET | `/api/sessions/{id}` | Get session + messages |
 | POST | `/api/sessions/{id}/messages` | Send message — body: `{content}` — returns `text/event-stream` SSE |
 | POST | `/api/sessions/{id}/end` | End interview — returns `FeedbackReport` |
@@ -163,6 +171,8 @@ POST /api/sessions/with-resume (multipart/form-data)
 | `Message` (sessionId, role, content) | Postgres `messages` table | JPA entity |
 | `InterviewContext` (full state) | Redis `interview:context:{uuid}` | 24h TTL, JSON via Jackson |
 | Resume text | Redis (in InterviewContext) + Postgres (in Session.resumeText) | NOT a separate table |
+| RAG chunks + embeddings | Redis Vector Search `rag:chunk:*` | Persistent, re-indexed on content change |
+| RAG index metadata | Redis `rag:index:status`, `rag:file:hash:*`, `rag:index:pending` | Incremental tracking + resume support |
 
 ---
 
@@ -177,6 +187,95 @@ POST /api/sessions/with-resume (multipart/form-data)
 | `AI_API_KEY` | API key for the provider |
 | `AI_BASE_URL` | Optional custom base URL (for OpenAI-compatible APIs) |
 | `APP_DEV_MODE` | `true`/`false` — enables dev shortcuts |
+| `RAG_ENABLED` | `true`/`false` — enables RAG (default: true) |
+| `RAG_GUIDE_PATH` | Path to interview-guide (default: `interview-guide`) |
+| `OLLAMA_BASE_URL` | Ollama URL for local embeddings (default: `http://localhost:11434`) |
+| `VOYAGE_API_KEY` | Voyage AI key — required when `AI_PROVIDER=anthropic` |
+
+---
+
+## RAG (Retrieval Augmented Generation)
+
+RAG retrieves relevant content from the `interview-guide` submodule to ground LLM responses in curated interview material.
+
+### Embedding Model Mapping
+
+| `AI_PROVIDER` | Embedding Model | Service | Cost |
+|---------------|-----------------|---------|------|
+| `anthropic` | voyage-3 | Voyage AI API | $0.06/1M tokens |
+| `openai` | text-embedding-3-small | OpenAI API | $0.02/1M tokens |
+| `sarvam` | nomic-embed-text | Ollama (Docker) | Free |
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    STARTUP (Background)                         │
+├─────────────────────────────────────────────────────────────────┤
+│  1. Enumerate interview-guide markdown files                    │
+│  2. Compute SHA-256 per-file hashes                             │
+│  3. Compare with stored Redis file hashes                        │
+│     ├─ unchanged files → skip                                   │
+│     ├─ changed/new files → re-parse + re-embed + upsert chunks │
+│     └─ deleted files → remove chunks + file hash metadata       │
+│  4. Persist pending file set during run (`rag:index:pending`)   │
+│  5. Resume from pending set after interruption, then mark       │
+│     `rag:index:status=complete`                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    PER-MESSAGE FLOW                             │
+├─────────────────────────────────────────────────────────────────┤
+│  1. RAGService.buildContext(userMessage, interviewType, topK)   │
+│  2. If not indexed yet → return "" (graceful degradation)       │
+│  3. Generate query embedding                                    │
+│  4. Vector search in Redis (filter by interviewType)            │
+│  5. Return top-K chunks as formatted context                    │
+│  6. Inject into prompt via InterviewPromptService               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Components
+
+| File | Purpose |
+|------|---------|
+| `EmbeddingConfig.java` | Creates embedding model bean based on `AI_PROVIDER` |
+| `InterviewGuideParser.java` | Parses markdown files into `DocumentChunk` records |
+| `InterviewGuideIndexer.java` | Manages indexing lifecycle, version hash check |
+| `RedisVectorStore.java` | Redis Vector Search operations via Jedis |
+| `RAGService.java` | Public API for retrieval, graceful degradation |
+
+### Interview Guide Structure
+
+```
+interview-guide/
+├── dsa/
+│   └── DSA Practice Sheet.md       # Problems in table format
+├── hld/
+│   ├── concepts/                   # 87 concept files
+│   └── example-systems/            # 35+ system design examples
+└── lld/
+    ├── design-patterns/            # 12 design pattern files
+    └── example-systems/            # 24 LLD examples
+```
+
+### Redis Keys
+
+| Key | Purpose |
+|-----|---------|
+| `rag:index:status` | `indexing` \| `complete` \| `failed` |
+| `rag:index:pending` | Set of file paths still pending (resume checkpoint) |
+| `rag:file:hash:{path}` | SHA-256 hash per indexed markdown file |
+| `rag:chunk:{id}` | Individual chunk data (HASH with vector) |
+| `rag_vectors` | RediSearch vector index name |
+
+### Graceful Degradation
+
+RAG is designed to fail gracefully:
+- If indexing is not complete (`indexing`/`failed`) → returns empty context
+- If embedding generation fails for a query → returns empty context
+- If vector search fails for a query → returns empty context
+- LLM continues to work normally, just without RAG context
 
 ---
 

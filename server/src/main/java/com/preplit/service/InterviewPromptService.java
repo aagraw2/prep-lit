@@ -1,6 +1,8 @@
 package com.preplit.service;
 
 import com.preplit.model.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +17,7 @@ import java.util.Map;
 @Service
 public class InterviewPromptService {
 
+    private static final Logger log = LoggerFactory.getLogger(InterviewPromptService.class);
     private static final String PROMPTS_DIR = "prompts/";
 
     /**
@@ -24,28 +27,50 @@ public class InterviewPromptService {
         Map<String, Object> variables = new HashMap<>();
         variables.put("interviewType", getInterviewTypeDescription(type));
         variables.put("roleLevel", getRoleLevelDescription(role));
-        
-        // Build system prompt
+
+        // Base system prompt
         String systemPrompt = loadAndSubstitute("interviewer-system", variables);
-        
-        // Add interview flow
-        String flowPrompt = loadAndSubstitute("interviewer-flow-" + type.name().toLowerCase(), new HashMap<>());
-        
-        // Add state context if available
+
+        // Phase-specific instructions (replaces the static flow file)
+        String phasePrompt = buildPhasePrompt(type, context, variables);
+
+        // State context
         String stateContext = context != null ? buildStateContext(context) : "";
 
-        // Add resume context for RESUME_GRILLING
+        // Resume section for RESUME_GRILLING
         String resumeSection = "";
         if (type == InterviewType.RESUME_GRILLING && context != null && context.getResumeText() != null) {
             resumeSection = buildResumeSection(context.getResumeText());
         }
 
-        // Add RAG context if available
+        // RAG context
         String ragSection = (ragContext != null && !ragContext.isBlank())
             ? "\n\nReference Knowledge:\n" + ragContext
             : "";
 
-        return systemPrompt + "\n\n" + flowPrompt + resumeSection + "\n\n" + stateContext + ragSection;
+        return systemPrompt + "\n\n" + phasePrompt + resumeSection + "\n\n" + stateContext + ragSection;
+    }
+
+    /**
+     * Loads the phase-specific prompt for the current interview type and phase.
+     * Falls back to the legacy flow file if no phase prompt exists.
+     */
+    private String buildPhasePrompt(InterviewType type, InterviewContext context, Map<String, Object> variables) {
+        String typeFolder = type.name().toLowerCase();
+        InterviewPhase phase = context != null ? context.getCurrentPhase() : InterviewPhase.INTRO;
+        String phaseFile = phaseToFileName(phase);
+        return loadAndSubstitute(typeFolder + "/" + phaseFile, variables);
+    }
+
+    private String phaseToFileName(InterviewPhase phase) {
+        return switch (phase) {
+            case INTRO -> "intro";
+            case CLARIFICATION -> "clarification";
+            case APPROACH -> "approach";
+            case DEEP_DIVE -> "deep_dive";
+            case IMPLEMENTATION -> "implementation";
+            case WRAP_UP -> "wrap_up";
+        } + ".txt";
     }
     
     /**

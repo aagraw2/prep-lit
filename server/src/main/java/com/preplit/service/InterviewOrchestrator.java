@@ -129,7 +129,13 @@ public class InterviewOrchestrator {
         if (analysis.reasoning() != null && !analysis.reasoning().isEmpty()) {
             context.addObservation(analysis.reasoning());
         }
-        
+
+        // Store chosen problem if the LLM detected one being introduced
+        if (analysis.chosenProblem() != null && context.getChosenProblem() == null) {
+            context.setChosenProblem(analysis.chosenProblem());
+            log.info("Chosen problem set for session {}: {}", sessionId, analysis.chosenProblem());
+        }
+
         // Save to Redis
         contextRepository.save(context);
         

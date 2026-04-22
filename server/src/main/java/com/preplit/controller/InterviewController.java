@@ -152,10 +152,12 @@ public class InterviewController {
         Session session = sessionService.getSession(id);
         List<Message> history = sessionService.getHistory(id);
 
-        // Update interview state asynchronously (doesn't block response)
+        // Process candidate response SYNCHRONOUSLY so phase + chosenProblem are up to date
+        // before we build the RAG context and system prompt for this turn
         InterviewContext context = orchestrator.getContext(id);
         if (context != null) {
-            orchestrator.processCandidateResponseAsync(id, req.content());
+            orchestrator.processCandidateResponse(id, req.content());
+            context = orchestrator.getContext(id); // re-fetch updated context
         }
 
         if (devMode) {
@@ -172,7 +174,7 @@ public class InterviewController {
 
         String ragContext;
         try {
-            ragContext = ragService.buildContext(req.content(), 5);
+            ragContext = ragService.buildContext(req.content(), session.getType(), context, 5);
         } catch (Exception e) {
             if (devMode) {
                 log.warn("RAG context failed: {}", e.getMessage());
@@ -201,7 +203,7 @@ public class InterviewController {
                 .flatMap(token -> {
                     buffer.append(token);
                     String result = processThinkTags(buffer, insideThinkTag);
-                    if (result.isEmpty()) {
+                    if (result == null || result.isEmpty()) {
                         return Flux.empty();
                     }
                     return Flux.just(result);
@@ -220,7 +222,9 @@ public class InterviewController {
                         sessionService.addMessage(id, MessageRole.ASSISTANT, assistantContent);
                     }
                 })
-                .map(token -> ServerSentEvent.<String>builder(token).build())
+                .flatMap(token -> token == null
+                        ? Flux.empty()
+                        : Flux.just(ServerSentEvent.<String>builder(token).build()))
                 .onErrorResume(e -> {
                     log.error("Error in streamChat: {}", e.getMessage(), e);
                     return Flux.just(ServerSentEvent.<String>builder("I'm sorry, I didn't catch that. Could you please repeat?").build());

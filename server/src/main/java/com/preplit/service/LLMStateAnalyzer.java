@@ -95,6 +95,9 @@ public class LLMStateAnalyzer {
         ScoreDeltas scoreDeltas = extractScoreDeltas(json);
         
         String reasoning = extractString(json, "reasoning", "");
+        String chosenProblem = extractString(json, "chosenProblem", null);
+        // treat literal "null" string as absent
+        if ("null".equalsIgnoreCase(chosenProblem)) chosenProblem = null;
         
         return new StateAnalysis(
             interviewerState,
@@ -110,7 +113,8 @@ public class LLMStateAnalyzer {
             shouldTransitionPhase,
             suggestedPhase,
             scoreDeltas,
-            reasoning
+            reasoning,
+            chosenProblem
         );
     }
     
@@ -223,7 +227,8 @@ record StateAnalysis(
     boolean shouldTransitionPhase,
     InterviewPhase suggestedPhase,
     ScoreDeltas scoreDeltas,
-    String reasoning
+    String reasoning,
+    String chosenProblem
 ) {
     static StateAnalysis fallback() {
         return new StateAnalysis(
@@ -231,16 +236,11 @@ record StateAnalysis(
             ConfidenceLevel.MEDIUM,
             EngagementLevel.MEDIUM,
             FrustrationLevel.LOW,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
+            false, false, false, false, false, false, false,
             InterviewPhase.CLARIFICATION,
             ScoreDeltas.zero(),
-            "Fallback due to analysis error"
+            "Fallback due to analysis error",
+            null
         );
     }
 }

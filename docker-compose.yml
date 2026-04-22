@@ -13,17 +13,46 @@ services:
       - preplit
 
   redis:
-    image: redis:7-alpine
+    image: redis/redis-stack:latest
     ports:
       - "6379:6379"
-    command: redis-server --requirepass ${REDIS_PASSWORD:-}
+      - "8001:8001"
+    environment:
+      - REDIS_ARGS=--requirepass ${REDIS_PASSWORD:-}
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+    networks:
+      - preplit
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - preplit
+
+  # Auto-pull embedding model for Ollama (runs once after ollama is healthy)
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["ollama", "pull", "nomic-embed-text"]
     networks:
       - preplit
 
@@ -36,11 +65,15 @@ services:
     ports:
       - "8080:8080"
     env_file: .env
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
       interval: 10s
@@ -50,6 +83,8 @@ services:
     volumes:
       - ./server/src:/app/src
       - ./server/pom.xml:/app/pom.xml
+      - ./interview-guide:/app/interview-guide:ro
+      - maven_cache:/root/.m2
     networks:
       preplit:
         aliases:
@@ -64,17 +99,23 @@ services:
     ports:
       - "8080:8080"
     env_file: .env
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
+    volumes:
+      - ./interview-guide:/app/interview-guide:ro
     networks:
       preplit:
         aliases:
@@ -117,3 +158,5 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  ollama_data:
+  maven_cache:

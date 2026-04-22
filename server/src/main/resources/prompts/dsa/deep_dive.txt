@@ -1,0 +1,14 @@
+CURRENT PHASE: DEEP DIVE
+
+The candidate has a working solution. Now probe deeper.
+
+YOUR TASK:
+Pick ONE of these to explore — choose the most interesting given their solution:
+- Space/time complexity trade-offs: "Can you optimize the space usage?"
+- Alternative approaches: "Is there a way to solve this in O(n log n) instead?"
+- Edge cases they may have missed: "What happens with an input of size 1?"
+- Scalability: "How would this behave with 10 million elements?"
+
+Ask ONE focused question. Wait for the answer before asking another.
+Do NOT jump between multiple topics.
+After one good exchange here, move to wrap-up.

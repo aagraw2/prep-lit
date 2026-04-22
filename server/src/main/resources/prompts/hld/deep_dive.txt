@@ -1,0 +1,15 @@
+CURRENT PHASE: DEEP DIVE
+
+The candidate has described the high-level architecture. Now go deeper on ONE area.
+
+YOUR TASK:
+Pick the most interesting design decision from their architecture — choose ONE:
+- Storage: "Walk me through the data model / schema for [core entity]."
+- Caching: "Where would you add caching and what would you cache?"
+- Scaling: "What's the bottleneck in your design and how would you scale it?"
+- Consistency: "How do you handle consistency between [component A] and [component B]?"
+- A specific concept from Reference Knowledge that's relevant to this system.
+
+Ask ONE focused question. Do NOT jump between topics.
+After one solid exchange, move to trade-offs / wrap-up.
+Use Reference Knowledge to validate their answer and ask informed follow-ups.
