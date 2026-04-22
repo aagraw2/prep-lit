@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -142,18 +143,69 @@ public class RAGService {
 
     // ── private helpers ───────────────────────────────────────────────────────
 
+    // How many problems to show the LLM per session — enough variety, not overwhelming
+    private static final int CATALOG_SAMPLE_SIZE = 10;
+
     private String fetchCatalog(String typeFilter) {
         if (typeFilter == null) return "";
-        List<DocumentChunk> catalog = vectorStore.getCatalogChunks(typeFilter);
-        if (catalog.isEmpty()) {
+        List<DocumentChunk> chunks = vectorStore.getCatalogChunks(typeFilter);
+        if (chunks.isEmpty()) {
             log.warn("No problem-catalog chunk found for type: {}", typeFilter);
             return "";
         }
-        DocumentChunk chunk = catalog.get(0);
-        return "=== Problem / System Catalog ===\n" +
-               "Pick ONE from this list. Do not invent a problem not on this list.\n\n" +
-               chunk.content() +
-               "\n=== End of Catalog ===";
+
+        // Extract all problem/system names from the catalog table rows across all chunks
+        List<String> allNames = new ArrayList<>();
+        for (DocumentChunk chunk : chunks) {
+            allNames.addAll(extractNamesFromCatalog(chunk.content()));
+        }
+
+        if (allNames.isEmpty()) {
+            // Fallback: just return the raw content of the first chunk
+            return "=== Problem / System Catalog ===\n" +
+                   "Pick ONE from this list. Do not invent a problem not on this list.\n\n" +
+                   chunks.get(0).content() +
+                   "\n=== End of Catalog ===";
+        }
+
+        // Shuffle and sample — different set every session
+        Collections.shuffle(allNames);
+        List<String> sample = allNames.subList(0, Math.min(CATALOG_SAMPLE_SIZE, allNames.size()));
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== Problem / System Catalog ===\n");
+        sb.append("Pick ONE from this list. Do not invent a problem not on this list.\n\n");
+        for (int i = 0; i < sample.size(); i++) {
+            sb.append(i + 1).append(". ").append(sample.get(i)).append("\n");
+        }
+        sb.append("\n=== End of Catalog ===");
+        return sb.toString();
+    }
+
+    /**
+     * Extracts problem/system names from a markdown table catalog.
+     * Handles both formats:
+     *   LLD/HLD Systems.md: | Name | Priority | Notes |
+     *   DSA Practice Sheet:  | Name | Link | Concept | Priority | Difficulty |
+     */
+    private List<String> extractNamesFromCatalog(String content) {
+        List<String> names = new ArrayList<>();
+        for (String line : content.split("\n")) {
+            String trimmed = line.trim();
+            if (!trimmed.startsWith("|")) continue;
+            String[] cols = trimmed.split("\\|");
+            if (cols.length < 2) continue;
+            String name = cols[1].trim();
+            // Skip header rows and separator rows
+            if (name.isBlank() || name.equals("Name") || name.startsWith("---")
+                    || name.startsWith("S. No") || name.equalsIgnoreCase("s. no")) continue;
+            // Strip markdown links like [Text](url)
+            name = name.replaceAll("\\[([^]]+)]\\([^)]+\\)", "$1").trim();
+            if (!name.isBlank()) {
+                names.add(name);
+            }
+        }
+        return names;
     }
 
     private String vectorSearch(String query, @Nullable String typeFilter, Set<String> categories, int topK) {

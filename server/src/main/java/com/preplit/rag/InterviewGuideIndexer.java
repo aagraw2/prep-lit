@@ -169,7 +169,17 @@ public class InterviewGuideIndexer {
                 }
 
             } catch (Exception e) {
-                log.error("Embedding batch failed", e);
+                log.error("Embedding batch failed: {}", e.getMessage());
+                // Check if it's a context length error — if so, skip oversized chunks
+                if (e.getMessage() != null && e.getMessage().contains("context length")) {
+                    log.warn("Skipping {} chunks due to context length — content too large for embedding model", batch.size());
+                    for (DocumentChunk chunk : batch) {
+                        log.debug("Skipped chunk: {} (length: {} chars)", chunk.title(), chunk.content().length());
+                    }
+                } else {
+                    // For other errors, still skip but log more details
+                    log.error("Unexpected embedding error, skipping batch", e);
+                }
             }
         }
 

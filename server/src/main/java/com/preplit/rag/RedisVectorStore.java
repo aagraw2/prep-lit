@@ -207,7 +207,7 @@ public class RedisVectorStore {
 
         Query query = new Query(filter)
                 .returnFields("content", "interviewType", "category", "title", "section", "sourcePath")
-                .limit(0, 1)
+                .limit(0, 20) // fetch all catalog chunks (large catalogs are split into multiple)
                 .dialect(2);
 
         try {

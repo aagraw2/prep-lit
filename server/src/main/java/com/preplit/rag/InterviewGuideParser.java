@@ -251,7 +251,7 @@ public class InterviewGuideParser {
 
     /**
      * Parses a catalog file (LLD Systems.md, HLD Systems.md) as a single chunk.
-     * These are index/navigation files — stored whole so they can be fetched as a unit.
+     * If the content exceeds the embedding token limit, splits into smaller chunks.
      */
     private List<DocumentChunk> parseCatalogFile(Path file, String interviewType) throws IOException {
         String content = Files.readString(file, StandardCharsets.UTF_8);
@@ -259,10 +259,59 @@ public class InterviewGuideParser {
         String title = fileName.replace(".md", "");
         String relativePath = file.toString();
 
-        String chunkId = generateId(relativePath, "catalog", content);
-        DocumentChunk chunk = DocumentChunk.of(chunkId, content, interviewType, "problem-catalog", relativePath, title, "Full Catalog");
-        log.info("Parsed catalog file: {} as single chunk", fileName);
-        return List.of(chunk);
+        // nomic-embed-text context limit ~8192 tokens ≈ 6000 chars safe limit
+        // If content fits, store as one chunk for easy catalog retrieval
+        if (content.length() <= 6000) {
+            String chunkId = generateId(relativePath, "catalog", content);
+            return List.of(DocumentChunk.of(chunkId, content, interviewType, "problem-catalog", relativePath, title, "Full Catalog"));
+        }
+
+        // Otherwise split by rows — each row is one system entry
+        List<DocumentChunk> chunks = new ArrayList<>();
+        String[] lines = content.split("\n");
+        StringBuilder currentChunk = new StringBuilder();
+        // Preserve header lines (priority legend + table header)
+        StringBuilder header = new StringBuilder();
+        boolean headerDone = false;
+        int chunkIndex = 0;
+
+        for (String line : lines) {
+            // Collect header until first data row
+            if (!headerDone) {
+                header.append(line).append("\n");
+                // Table header separator row signals end of header
+                if (line.startsWith("| ---") || line.startsWith("|---")) {
+                    headerDone = true;
+                }
+                continue;
+            }
+
+            // Skip empty / non-table lines
+            if (!line.trim().startsWith("|")) {
+                continue;
+            }
+
+            currentChunk.append(line).append("\n");
+
+            // Flush every ~20 rows or when approaching size limit
+            if (currentChunk.length() > 4000) {
+                String chunkContent = header + currentChunk.toString();
+                String chunkId = generateId(relativePath, "catalog-" + chunkIndex, chunkContent);
+                chunks.add(DocumentChunk.of(chunkId, chunkContent, interviewType, "problem-catalog", relativePath, title, "Catalog Part " + (chunkIndex + 1)));
+                currentChunk.setLength(0);
+                chunkIndex++;
+            }
+        }
+
+        // Flush remainder
+        if (!currentChunk.isEmpty()) {
+            String chunkContent = header + currentChunk.toString();
+            String chunkId = generateId(relativePath, "catalog-" + chunkIndex, chunkContent);
+            chunks.add(DocumentChunk.of(chunkId, chunkContent, interviewType, "problem-catalog", relativePath, title, "Catalog Part " + (chunkIndex + 1)));
+        }
+
+        log.info("Parsed catalog file: {} into {} chunks", fileName, chunks.size());
+        return chunks;
     }
 
     /**
@@ -326,8 +375,9 @@ public class InterviewGuideParser {
     }
 
     private String truncateContent(String content, int maxTokens) {
-        // Rough estimate: 1 token ≈ 4 characters
-        int maxChars = maxTokens * 4;
+        // nomic-embed-text context limit is 8192 tokens. Cap at 1500 tokens (~6000 chars) to stay safe.
+        int safeMax = Math.min(maxTokens, 1500);
+        int maxChars = safeMax * 4;
         if (content.length() <= maxChars) {
             return content;
         }

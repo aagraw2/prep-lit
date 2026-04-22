@@ -70,7 +70,7 @@ public class InterviewPromptService {
             case DEEP_DIVE -> "deep_dive";
             case IMPLEMENTATION -> "implementation";
             case WRAP_UP -> "wrap_up";
-        } + ".txt";
+        };
     }
     
     /**

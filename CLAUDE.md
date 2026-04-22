@@ -4,7 +4,7 @@
 PrepLit is a real-time AI-powered mock interview platform. It uses voice input, streams LLM responses via SSE, and speaks them back via TTS. The backend is **Spring WebFlux (reactive/Netty)** — NOT Spring MVC. This matters for file uploads, return types, etc.
 
 ## Tech Stack
-- **Frontend**: React + TypeScript + Vite (port 5173)
+- **Frontend**: React + TypeScript + Vite (port 3000)
 - **Backend**: Java Spring Boot + WebFlux (port 8080)
 - **LLM**: Configurable via `ai.provider` — supports `anthropic`, `openai`, `sarvam`
 - **LLM SDK**: LangChain4j (`dev.langchain4j`) — NOT the raw Anthropic SDK
@@ -52,12 +52,12 @@ prep-lit/
     │   └── GlobalExceptionHandler.java       # @RestControllerAdvice error handling
     ├── service/
     │   ├── InterviewOrchestrator.java        # Coordinates interview flow, saves to Redis
-    │   ├── InterviewPromptService.java       # Builds prompts from .txt templates + context
+    │   ├── InterviewPromptService.java       # Builds prompts from phase-specific .txt templates + context
     │   ├── LLMStateAnalyzer.java             # Calls LLM to analyze candidate state → StateAnalysis record
     │   ├── FeedbackGenerator.java            # Generates FeedbackReport from InterviewContext
     │   ├── ResumeParserService.java          # PDF → text via PDFBox; takes FilePart (reactive)
     │   ├── SessionService.java               # CRUD for Session + Message (Postgres)
-    │   ├── RAGService.java                   # Retrieves interview guide content via vector search
+    │   ├── RAGService.java                   # Phase-aware retrieval from interview guide via vector search
     │   └── SessionNotFoundException.java
     ├── rag/
     │   ├── DocumentChunk.java                # Record: chunk content + metadata + embedding
@@ -65,7 +65,7 @@ prep-lit/
     │   ├── InterviewGuideIndexer.java        # Async startup indexing with per-file hash diff + resume
     │   └── RedisVectorStore.java             # Redis Vector Search operations (RediSearch)
     ├── model/
-    │   ├── InterviewContext.java             # Full session state — stored in Redis
+    │   ├── InterviewContext.java             # Full session state — stored in Redis; includes chosenProblem
     │   ├── CandidateStateModel.java          # record: confidence, engagement, frustration, stuckTurns
     │   ├── EvaluationScores.java             # record: 5 scores [0-100], totalScore() = avg
     │   ├── Session.java                      # JPA entity — sessions table (Postgres)
@@ -99,18 +99,38 @@ prep-lit/
 ## Prompt Templates (`server/src/main/resources/prompts/`)
 All loaded by `InterviewPromptService` via `ClassPathResource`. Variables substituted as `{{varName}}`.
 
+### Base templates (always loaded)
+
 | File | Purpose |
 |------|---------|
 | `interviewer-system.txt` | Base interviewer persona; vars: `{{interviewType}}`, `{{roleLevel}}` |
-| `interviewer-flow-dsa.txt` | DSA-specific flow instructions |
-| `interviewer-flow-hld.txt` | HLD-specific flow instructions |
-| `interviewer-flow-lld.txt` | LLD-specific flow instructions |
-| `interviewer-flow-resume_grilling.txt` | Resume deep dive flow |
-| `interviewer-flow-culture_fit.txt` | Culture fit / STAR flow |
 | `interviewer-state-context.txt` | Injected per-turn with live state; vars: phase, scores, hints, etc. |
-| `state-analysis.txt` | Prompt for `LLMStateAnalyzer` — expects JSON response |
+| `state-analysis.txt` | Prompt for `LLMStateAnalyzer` — expects JSON response with `chosenProblem` field |
 
-`InterviewPromptService.buildInterviewerPrompt()` assembles: system + flow + resume section (if RESUME_GRILLING) + state context + RAG context (from interview guide).
+### Phase-specific prompts (loaded dynamically per turn)
+
+Organized by interview type. `InterviewPromptService.buildPhasePrompt()` loads `{type}/{phase}.txt` based on the current `InterviewPhase`.
+
+```
+prompts/
+├── dsa/
+│   ├── intro.txt
+│   ├── clarification.txt
+│   ├── approach.txt
+│   ├── deep_dive.txt
+│   ├── implementation.txt
+│   └── wrap_up.txt
+├── hld/
+│   └── (same 6 files)
+├── lld/
+│   └── (same 6 files)
+├── culture_fit/
+│   └── (same 6 files)
+└── resume_grilling/
+    └── (same 6 files)
+```
+
+`InterviewPromptService.buildInterviewerPrompt()` assembles: `interviewer-system.txt` + phase prompt (`{type}/{phase}.txt`) + resume section (if RESUME_GRILLING) + `interviewer-state-context.txt` + RAG context.
 
 ---
 
@@ -135,19 +155,24 @@ All loaded by `InterviewPromptService` via `ClassPathResource`. Variables substi
 2. InterviewSession.tsx calls sendMessage() in client.ts
 3. POST /api/sessions/{id}/messages
 4. InterviewController: adds user message to Postgres
-5. InterviewOrchestrator.processCandidateResponseAsync() — fires async, doesn't block stream
-6. InterviewPromptService.buildInterviewerPrompt() — builds full system prompt from templates + Redis state
-7. ModelRouter.streamChat() — streams tokens from LLM
-8. SSE tokens → client accumulates → MessageList renders
-9. useTextToSpeech.ts speaks the response
+5. InterviewOrchestrator.processCandidateResponse() — SYNCHRONOUS, runs before RAG/prompt
+   → LLMStateAnalyzer updates phase, chosenProblem, scores, candidate state in Redis
+6. RAGService.buildContext() — phase-aware retrieval (see RAG section)
+7. InterviewPromptService.buildInterviewerPrompt() — loads phase-specific prompt + state context
+8. ModelRouter.streamChat() — streams tokens from LLM
+9. SSE tokens → client accumulates → MessageList renders
+10. useTextToSpeech.ts speaks the response
 ```
 
-### State Update (async, background)
+### State Update (synchronous, blocks before response)
 ```
-processCandidateResponseAsync()
+processCandidateResponse()
   → LLMStateAnalyzer.analyze() — calls ChatLanguageModel (non-streaming) with state-analysis.txt prompt
-  → Returns StateAnalysis record (interviewerState, confidence, engagement, frustration, scoreDeltas, phase transition, etc.)
-  → Updates InterviewContext fields
+  → Returns StateAnalysis record:
+      interviewerState, confidence, engagement, frustration,
+      scoreDeltas, shouldTransitionPhase, suggestedPhase,
+      chosenProblem (extracted when interviewer introduces a problem)
+  → Updates InterviewContext fields including chosenProblem (set once, never overwritten)
   → contextRepository.save() → Redis
 ```
 
@@ -206,6 +231,28 @@ RAG retrieves relevant content from the `interview-guide` submodule to ground LL
 | `openai` | text-embedding-3-small | OpenAI API | $0.02/1M tokens |
 | `sarvam` | nomic-embed-text | Ollama (Docker) | Free |
 
+### Phase-Aware Retrieval Strategy
+
+`RAGService.buildContext()` selects a retrieval strategy based on the current `InterviewPhase` and `chosenProblem`:
+
+| Phase | Strategy |
+|-------|----------|
+| `INTRO` | Fetch the full `problem-catalog` chunk (`LLD Systems.md` / `HLD Systems.md` / `DSA Practice Sheet`) — gives LLM the complete list to pick from |
+| `CLARIFICATION` | `searchByTitle(chosenProblem)` — fetches all chunks of the chosen system's example doc |
+| `APPROACH` / `IMPLEMENTATION` | `searchByTitle(chosenProblem)` (3 chunks) + enriched vector search (`chosenProblem + userMessage`) |
+| `DEEP_DIVE` | Enriched vector search with **no category filter** — surfaces design patterns, HLD concepts, etc. naturally |
+| `CULTURE_FIT` / `RESUME_GRILLING` | Plain vector search, no type filter |
+
+### Document Categories (stored in Redis as `category` tag field)
+
+| Category | Source | Used for |
+|----------|--------|---------|
+| `problem` | `dsa/DSA Practice Sheet.md` rows | DSA problem retrieval |
+| `problem-catalog` | `lld/LLD Systems.md`, `hld/HLD Systems.md` | INTRO phase — full system list |
+| `example-system` | `lld/example-systems/`, `hld/example-systems/` | Chosen problem deep-dive |
+| `concept` | `hld/concepts/`, `lld/*.md` root files | HLD/LLD concept retrieval |
+| `design-pattern` | `lld/design-patterns/` | LLD design pattern retrieval |
+
 ### Architecture
 
 ```
@@ -226,12 +273,14 @@ RAG retrieves relevant content from the `interview-guide` submodule to ground LL
 ┌─────────────────────────────────────────────────────────────────┐
 │                    PER-MESSAGE FLOW                             │
 ├─────────────────────────────────────────────────────────────────┤
-│  1. RAGService.buildContext(userMessage, interviewType, topK)   │
-│  2. If not indexed yet → return "" (graceful degradation)       │
-│  3. Generate query embedding                                    │
-│  4. Vector search in Redis (filter by interviewType)            │
-│  5. Return top-K chunks as formatted context                    │
-│  6. Inject into prompt via InterviewPromptService               │
+│  1. RAGService.buildContext(userMessage, type, context)         │
+│  2. Select strategy based on InterviewPhase + chosenProblem     │
+│  3. INTRO → getCatalogChunks(typeFilter)                        │
+│     CLARIFICATION → searchByTitle(chosenProblem, typeFilter)    │
+│     APPROACH/IMPL → searchByTitle + enriched vector search      │
+│     DEEP_DIVE → enriched vector search, no category filter      │
+│  4. Return formatted context string                             │
+│  5. Inject into prompt via InterviewPromptService               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -240,24 +289,33 @@ RAG retrieves relevant content from the `interview-guide` submodule to ground LL
 | File | Purpose |
 |------|---------|
 | `EmbeddingConfig.java` | Creates embedding model bean based on `AI_PROVIDER` |
-| `InterviewGuideParser.java` | Parses markdown files into `DocumentChunk` records |
-| `InterviewGuideIndexer.java` | Manages indexing lifecycle, version hash check |
-| `RedisVectorStore.java` | Redis Vector Search operations via Jedis |
-| `RAGService.java` | Public API for retrieval, graceful degradation |
+| `InterviewGuideParser.java` | Parses markdown files into `DocumentChunk` records; catalog files split into ≤4000 char chunks |
+| `InterviewGuideIndexer.java` | Manages indexing lifecycle, version hash check; skips chunks exceeding embedding context limit |
+| `RedisVectorStore.java` | Redis Vector Search operations; includes `searchByTitle()` and `getCatalogChunks()` |
+| `RAGService.java` | Phase-aware retrieval; builds enriched queries using `chosenProblem + userMessage` |
 
 ### Interview Guide Structure
 
 ```
 interview-guide/
 ├── dsa/
-│   └── DSA Practice Sheet.md       # Problems in table format
+│   └── DSA Practice Sheet.md       # Problems in table format (parsed row-by-row as `problem` chunks)
 ├── hld/
-│   ├── concepts/                   # 87 concept files
-│   └── example-systems/            # 35+ system design examples
+│   ├── HLD Systems.md              # System catalog → `problem-catalog` chunks
+│   ├── HLD Concepts.md             # Overview → `concept` chunk
+│   ├── concepts/                   # 87 concept files → `concept` chunks (split by H2)
+│   └── example-systems/            # 35+ system design examples → `example-system` chunks (split by H2)
 └── lld/
-    ├── design-patterns/            # 12 design pattern files
-    └── example-systems/            # 24 LLD examples
+    ├── LLD Systems.md              # System catalog → `problem-catalog` chunks
+    ├── *.md (root)                 # SOLID, OOP, etc. → `concept` chunks
+    ├── design-patterns/            # 12 design pattern files → `design-pattern` chunks
+    └── example-systems/            # 24 LLD examples → `example-system` chunks (split by H2)
 ```
+
+### Chunk Size Limits
+- All chunks capped at **1500 tokens (~6000 chars)** to stay safely under `nomic-embed-text`'s 8192 token context limit
+- Catalog files split into ≤4000 char pieces (by table rows) if they exceed 6000 chars
+- Indexer skips chunks that still exceed the limit and logs a warning — does not fail the whole file
 
 ### Redis Keys
 
@@ -272,9 +330,9 @@ interview-guide/
 ### Graceful Degradation
 
 RAG is designed to fail gracefully:
-- If indexing is not complete (`indexing`/`failed`) → returns empty context
-- If embedding generation fails for a query → returns empty context
-- If vector search fails for a query → returns empty context
+- If indexing is not complete → returns empty context
+- If embedding generation fails → returns empty context
+- If vector search fails → returns empty context
 - LLM continues to work normally, just without RAG context
 
 ---
@@ -292,6 +350,26 @@ RAG is designed to fail gracefully:
 - Provider switching is purely config-driven (`ai.provider`). Supports `anthropic`, `openai`, `sarvam` (OpenAI-compatible).
 - `LangChain4jModelRouter` wraps `StreamingChatLanguageModel` and converts to `Flux<String>`.
 - `LLMStateAnalyzer` uses `ChatLanguageModel` (blocking) and parses JSON manually from the response.
+- `<think>` tags from reasoning models are stripped in `InterviewController` before SSE and before saving to Postgres.
+
+---
+
+## Interview State Machine
+
+### `InterviewPhase` transitions
+```
+INTRO → CLARIFICATION → APPROACH → IMPLEMENTATION → DEEP_DIVE → WRAP_UP
+```
+Transitions are detected by `LLMStateAnalyzer` each turn (`shouldTransitionPhase` + `suggestedPhase` in JSON output).
+
+### `chosenProblem` lifecycle
+- Set once when `LLMStateAnalyzer` detects the interviewer introduced a problem (`chosenProblem` field in JSON)
+- Stored in `InterviewContext.chosenProblem` (Redis)
+- Never overwritten once set
+- Used by `RAGService` to fetch the right example system doc for all subsequent turns
+
+### State analysis runs synchronously
+`InterviewController` calls `orchestrator.processCandidateResponse()` (not async) before building RAG context and system prompt. This ensures phase transitions and `chosenProblem` are reflected in the same turn they occur.
 
 ---
 
@@ -300,23 +378,6 @@ RAG is designed to fail gracefully:
 - `totalScore()` = simple average of all 5.
 - Scores updated via `ScoreDeltas` from `LLMStateAnalyzer` each turn.
 - `Verdict`: `HIRE` (≥70), `BORDERLINE` (≥50), `NO_HIRE` (<50).
-
----
-
-## Common Issues & Fixes
-
-### 415 UNSUPPORTED_MEDIA_TYPE on resume upload
-- Cause: Using `MultipartFile` in a WebFlux controller.
-- Fix: Use `FilePart` + `Mono<ResponseType>` return. `ResumeParserService.extractText()` returns `Mono<String>`.
-
-### LLM response has `<think>` tags
-- Location: `InterviewController.java` — `processThinkTags()` and `stripThinkTags()` filter them before SSE.
-
-### Repetitive interviewer responses
-- Location: `prompts/interviewer-system.txt` — prompt instructs variety in acknowledgments.
-
-### Redis deserialization issues
-- `InterviewContextRepository.findById()` handles both `InterviewContext` and `LinkedHashMap` (Jackson fallback via `objectMapper.convertValue()`).
 
 ---
 
@@ -343,7 +404,7 @@ ALTER TABLE sessions ADD CONSTRAINT sessions_type_check
 ## Running Locally
 ```bash
 # Docker (recommended)
-docker-compose up
+docker-compose --profile dev up
 
 # Frontend only
 cd client && npm install && npm run dev
