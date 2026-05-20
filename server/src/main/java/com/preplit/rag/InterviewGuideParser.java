@@ -75,6 +75,12 @@ public class InterviewGuideParser {
             chunks.addAll(parseLldDirectory(lldPath));
         }
 
+        // Parse API+DB Design
+        Path apiDbPath = basePath.resolve("api-db");
+        if (Files.exists(apiDbPath)) {
+            chunks.addAll(parseApiDbDirectory(apiDbPath));
+        }
+
         log.info("Parsed {} total chunks from interview guide", chunks.size());
         return chunks;
     }
@@ -497,6 +503,52 @@ public class InterviewGuideParser {
     }
 
     /**
+     * Parses the api-db directory for API and Database Design interview content.
+     * Structure mirrors HLD: root catalog file, concepts/, example-systems/
+     */
+    private List<DocumentChunk> parseApiDbDirectory(Path apiDbPath) throws IOException {
+        List<DocumentChunk> chunks = new ArrayList<>();
+
+        // Parse root files — catalog file and any overview docs
+        try (Stream<Path> files = Files.list(apiDbPath)) {
+            List<Path> mdFiles = files.filter(p -> p.toString().endsWith(".md")).toList();
+            for (Path file : mdFiles) {
+                String lowerName = file.getFileName().toString().toLowerCase();
+                if (lowerName.contains("interviews.md")) {
+                    chunks.addAll(parseCatalogFile(file, "API_DB"));
+                } else {
+                    chunks.addAll(parseConceptFile(file, "API_DB", "concept"));
+                }
+            }
+        }
+
+        // Parse concepts
+        Path conceptsPath = apiDbPath.resolve("concepts");
+        if (Files.exists(conceptsPath)) {
+            try (Stream<Path> files = Files.walk(conceptsPath, 1)) {
+                List<Path> mdFiles = files.filter(p -> p.toString().endsWith(".md")).toList();
+                for (Path file : mdFiles) {
+                    chunks.addAll(parseConceptFile(file, "API_DB", "concept"));
+                }
+            }
+        }
+
+        // Parse example systems
+        Path examplesPath = apiDbPath.resolve("example-systems");
+        if (Files.exists(examplesPath)) {
+            try (Stream<Path> files = Files.walk(examplesPath, 1)) {
+                List<Path> mdFiles = files.filter(p -> p.toString().endsWith(".md")).toList();
+                for (Path file : mdFiles) {
+                    chunks.addAll(parseConceptFile(file, "API_DB", "example-system"));
+                }
+            }
+        }
+
+        log.info("Parsed {} API+DB chunks", chunks.size());
+        return chunks;
+    }
+
+    /**
      * Determines interview type and category from file path.
      */
     private FileTypeInfo determineFileType(String filePath) {
@@ -515,6 +567,11 @@ public class InterviewGuideParser {
             if (normalizedPath.contains("/design-patterns/")) return new FileTypeInfo("LLD", "design-pattern");
             if (normalizedPath.contains("/example-systems/")) return new FileTypeInfo("LLD", "example-system");
             return new FileTypeInfo("LLD", "concept");
+        } else if (normalizedPath.contains("/api-db/")) {
+            if (fileName.contains("interviews.md")) return new FileTypeInfo("API_DB", "problem-catalog");
+            if (normalizedPath.contains("/concepts/")) return new FileTypeInfo("API_DB", "concept");
+            if (normalizedPath.contains("/example-systems/")) return new FileTypeInfo("API_DB", "example-system");
+            return new FileTypeInfo("API_DB", "concept");
         }
 
         // Default fallback

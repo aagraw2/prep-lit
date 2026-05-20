@@ -31,7 +31,7 @@ ANALYZE AND RESPOND WITH JSON:
   "asksForAnswer": true|false,
   "communicationQuality": "POOR|FAIR|GOOD|EXCELLENT",
   "shouldTransitionPhase": true|false,
-  "suggestedPhase": "INTRO|CLARIFICATION|APPROACH|IMPLEMENTATION|DEEP_DIVE|WRAP_UP",
+  "suggestedPhase": "INTRO|CLARIFICATION|APPROACH|IMPLEMENTATION|DEEP_DIVE|WRAP_UP|REQUIREMENTS|API_DESIGN|SCHEMA_DESIGN",
   "chosenProblem": "exact problem/system name if the interviewer just introduced one, otherwise null",
   "scoreDeltas": {
     "problemUnderstanding": -20 to +20,
@@ -65,6 +65,10 @@ PHASE TRANSITIONS:
 - APPROACH → IMPLEMENTATION: Candidate ready to code (DSA) or has walked through class/component design (LLD/HLD)
 - IMPLEMENTATION → DEEP_DIVE: Candidate completes implementation or detailed design
 - DEEP_DIVE → WRAP_UP: Sufficient discussion of optimizations/tradeoffs
+- INTRO → REQUIREMENTS: Candidate acknowledges the API+DB design problem (API_AND_DATABASE_DESIGN interviews)
+- REQUIREMENTS → API_DESIGN: Candidate has clarified core requirements — 2-3 turns is enough (API_AND_DATABASE_DESIGN)
+- API_DESIGN → SCHEMA_DESIGN: Candidate has described the main API endpoints and request/response shapes (API_AND_DATABASE_DESIGN)
+- SCHEMA_DESIGN → DEEP_DIVE: Candidate has described the core database schema and key relationships (API_AND_DATABASE_DESIGN)
 
 IMPORTANT: Bias toward transitioning forward. Staying too long in CLARIFICATION is a worse outcome than moving forward with incomplete requirements. If the candidate has given 2+ substantive responses in CLARIFICATION, transition to APPROACH.
 

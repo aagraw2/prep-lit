@@ -33,5 +33,25 @@ public enum InterviewPhase {
     /**
      * Wrap up phase - final questions and feedback.
      */
-    WRAP_UP
+    WRAP_UP,
+
+    /**
+     * Requirements phase - candidate clarifies functional and non-functional
+     * requirements for the system. Used by API_AND_DATABASE_DESIGN interviews.
+     */
+    REQUIREMENTS,
+
+    /**
+     * API design phase - candidate designs the REST/GraphQL API including
+     * endpoints, request/response shapes, versioning, and authentication.
+     * Used by API_AND_DATABASE_DESIGN interviews.
+     */
+    API_DESIGN,
+
+    /**
+     * Schema design phase - candidate designs the database schema including
+     * entities, relationships, indexes, and normalization decisions.
+     * Used by API_AND_DATABASE_DESIGN interviews.
+     */
+    SCHEMA_DESIGN
 }

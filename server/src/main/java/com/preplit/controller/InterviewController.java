@@ -123,6 +123,7 @@ public class InterviewController {
             case LLD -> "Hello! I'm your PrepLit interviewer for today's low-level design interview. Before we start, please introduce yourself briefly.";
             case CULTURE_FIT -> "Hello! I'm your PrepLit interviewer for today's culture fit interview. Let's start — tell me about yourself and what you're looking for in your next role.";
             case RESUME_GRILLING -> "Hello! I've reviewed your resume. Let's dive in. Tell me briefly about your current role and what you've been working on recently.";
+            case API_AND_DATABASE_DESIGN -> "Hello! I'm your PrepLit interviewer for today's API and database design interview. Before we start, please introduce yourself briefly.";
         };
     }
 

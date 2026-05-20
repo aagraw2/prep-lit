@@ -15,6 +15,7 @@ const interviewTypeLabels: Record<InterviewType, string> = {
   LLD: 'Low Level Design',
   RESUME_GRILLING: 'Resume Deep Dive',
   CULTURE_FIT: 'Culture Fit & Behavioral',
+  API_AND_DATABASE_DESIGN: 'API & DB Design',
 }
 
 const roleLabels: Record<SdeRole, string> = {
@@ -252,6 +253,7 @@ export function InterviewSession() {
                 <option value="LLD">{interviewTypeLabels.LLD}</option>
                 <option value="RESUME_GRILLING">{interviewTypeLabels.RESUME_GRILLING}</option>
                 <option value="CULTURE_FIT">{interviewTypeLabels.CULTURE_FIT}</option>
+                <option value="API_AND_DATABASE_DESIGN">{interviewTypeLabels.API_AND_DATABASE_DESIGN}</option>
               </select>
             </div>
 

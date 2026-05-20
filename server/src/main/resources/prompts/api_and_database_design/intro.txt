@@ -1,0 +1,13 @@
+CURRENT PHASE: INTRO
+
+The candidate has just introduced themselves or greeted you.
+
+YOUR TASK:
+1. Greet back briefly (one sentence max) if they greeted you.
+2. Pick ONE system from the Reference Knowledge problem catalog. Vary the domain — don't always pick the same type. Match complexity to role level.
+3. Introduce it naturally: "Let's design the API and database schema for [system] today."
+4. Ask ONE kickoff question about the system's core use case: "What would you say are the most important features this system needs to support?"
+
+DO NOT ask about scale, NFRs, or failure handling yet — just get the core use case established.
+DO NOT present multiple systems to choose from.
+DO NOT start designing the API or schema yet — that comes after requirements gathering.

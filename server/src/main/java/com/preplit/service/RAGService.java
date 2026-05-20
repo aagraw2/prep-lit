@@ -78,6 +78,11 @@ public class RAGService {
                 return vectorSearch(userMessage, null, Collections.emptySet(), topK);
             }
 
+            // API_AND_DATABASE_DESIGN — custom phase flow
+            if (type == InterviewType.API_AND_DATABASE_DESIGN) {
+                return buildApiDbContext(userMessage, phase, chosenProblem, typeFilter, topK);
+            }
+
             // CLARIFICATION — fetch the full chosen problem doc by title
             if (phase == InterviewPhase.CLARIFICATION && chosenProblem != null) {
                 List<DocumentChunk> chunks = vectorStore.searchByTitle(chosenProblem, typeFilter, topK);
@@ -111,6 +116,61 @@ public class RAGService {
     }
 
     // ── kept for backward compat ──────────────────────────────────────────────
+
+    /**
+     * Phase-aware RAG retrieval for API_AND_DATABASE_DESIGN interviews.
+     *
+     * INTRO:         fetch the full API+DB problem catalog
+     * REQUIREMENTS:  vector search for the chosen problem's system context
+     * API_DESIGN:    chosen problem doc (title search) + API design concept search
+     * SCHEMA_DESIGN: chosen problem doc (title search) + DB design concept search
+     * DEEP_DIVE:     enriched vector search, no category filter
+     * WRAP_UP:       no RAG needed
+     */
+    private String buildApiDbContext(String userMessage, InterviewPhase phase,
+                                     String chosenProblem, String typeFilter, int topK) {
+        try {
+            if (phase == null || phase == InterviewPhase.INTRO) {
+                return fetchCatalog(typeFilter);
+            }
+
+            if (phase == InterviewPhase.WRAP_UP) {
+                return "";
+            }
+
+            if (phase == InterviewPhase.REQUIREMENTS) {
+                String query = chosenProblem != null ? chosenProblem + " " + userMessage : userMessage;
+                return vectorSearch(query, typeFilter, Collections.emptySet(), topK);
+            }
+
+            if (phase == InterviewPhase.API_DESIGN && chosenProblem != null) {
+                List<DocumentChunk> problemChunks = vectorStore.searchByTitle(chosenProblem, typeFilter, 3);
+                String enrichedQuery = chosenProblem + " API design endpoints REST " + userMessage;
+                String vectorResults = vectorSearch(enrichedQuery, typeFilter, Collections.emptySet(), topK - problemChunks.size());
+                return formatContext(problemChunks) + (vectorResults.isBlank() ? "" : "\n\n" + vectorResults);
+            }
+
+            if (phase == InterviewPhase.SCHEMA_DESIGN && chosenProblem != null) {
+                List<DocumentChunk> problemChunks = vectorStore.searchByTitle(chosenProblem, typeFilter, 3);
+                String enrichedQuery = chosenProblem + " database schema design entities relationships " + userMessage;
+                String vectorResults = vectorSearch(enrichedQuery, typeFilter, Collections.emptySet(), topK - problemChunks.size());
+                return formatContext(problemChunks) + (vectorResults.isBlank() ? "" : "\n\n" + vectorResults);
+            }
+
+            if (phase == InterviewPhase.DEEP_DIVE) {
+                String enrichedQuery = (chosenProblem != null ? chosenProblem + " " : "") + userMessage;
+                return vectorSearch(enrichedQuery, null, Collections.emptySet(), topK);
+            }
+
+            // Fallback for any unhandled phase
+            String enrichedQuery = (chosenProblem != null ? chosenProblem + " " : "") + userMessage;
+            return vectorSearch(enrichedQuery, typeFilter, Collections.emptySet(), topK);
+
+        } catch (Exception e) {
+            log.warn("RAG buildApiDbContext failed for phase {}: {}", phase, e.getMessage());
+            return "";
+        }
+    }
 
     public String buildContext(String query, int topK) {
         return buildContext(query, null, null, topK);
@@ -244,6 +304,7 @@ public class RAGService {
             case HLD -> "HLD";
             case LLD -> "LLD";
             case RESUME_GRILLING, CULTURE_FIT -> null;
+            case API_AND_DATABASE_DESIGN -> "API_DB";
         };
     }
 

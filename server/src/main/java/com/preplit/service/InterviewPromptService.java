@@ -70,6 +70,9 @@ public class InterviewPromptService {
             case DEEP_DIVE -> "deep_dive";
             case IMPLEMENTATION -> "implementation";
             case WRAP_UP -> "wrap_up";
+            case REQUIREMENTS -> "requirements";
+            case API_DESIGN -> "api_design";
+            case SCHEMA_DESIGN -> "schema_design";
         };
     }
     
@@ -213,6 +216,7 @@ public class InterviewPromptService {
             case LLD -> "Low Level Design";
             case RESUME_GRILLING -> "Resume Deep Dive";
             case CULTURE_FIT -> "Culture Fit and Behavioral";
+            case API_AND_DATABASE_DESIGN -> "API and Database Design";
         };
     }
     

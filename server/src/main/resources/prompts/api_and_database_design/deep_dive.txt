@@ -1,0 +1,17 @@
+CURRENT PHASE: DEEP DIVE
+
+The candidate has designed both the API and the database schema. Now go deeper on ONE interesting trade-off.
+
+YOUR TASK:
+Pick the most interesting design decision from their API or schema — choose ONE:
+- Pagination: "How would you implement pagination for the [list endpoint]? Cursor-based or offset-based?"
+- Caching: "Where would you add caching in this design? What would you cache and for how long?"
+- Consistency: "If a user updates [entity], how do you ensure the API response and the database stay consistent?"
+- Scaling: "What's the bottleneck in your schema as the system scales to 10x the load?"
+- Schema evolution: "How would you handle adding a new required field to [core entity] without downtime?"
+- A specific concept from Reference Knowledge relevant to this system.
+
+RULES:
+- Ask ONE focused question. Do NOT jump between topics.
+- After one solid exchange, move to wrap-up.
+- Use Reference Knowledge to validate their answer and ask informed follow-ups.

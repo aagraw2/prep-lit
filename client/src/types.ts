@@ -1,4 +1,4 @@
-export type InterviewType = 'DSA' | 'HLD' | 'LLD' | 'RESUME_GRILLING' | 'CULTURE_FIT'
+export type InterviewType = 'DSA' | 'HLD' | 'LLD' | 'RESUME_GRILLING' | 'CULTURE_FIT' | 'API_AND_DATABASE_DESIGN'
 export type SdeRole = 'SDE1' | 'SDE2' | 'SDE3'
 
 export interface FeedbackReport {
